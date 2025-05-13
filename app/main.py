@@ -54,5 +54,10 @@ def health():
         raise HTTPException(status_code=503, detail=str(e))
 
 
+@app.get("/")
+def root():
+    return {"status": "ok"}
+
+
 # Prometheus metrics
 app.mount("/metrics", make_asgi_app())
