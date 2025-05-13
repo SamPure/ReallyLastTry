@@ -1,9 +1,9 @@
 import logging
 from fastapi import FastAPI
-from prometheus_client import make_asgi_app
 from pythonjsonlogger import jsonlogger
+from prometheus_client import make_asgi_app
 
-# Structured JSON logging
+# JSON logging
 handler = logging.StreamHandler()
 handler.setFormatter(jsonlogger.JsonFormatter())
 logging.getLogger().handlers = [handler]
@@ -14,15 +14,14 @@ app = FastAPI(title="Lead Follow-up Service")
 
 @app.get("/health")
 def health():
-    # Railway liveness probe
+    # Liveness probe for Railway
     return {"status": "ok"}
 
 
 @app.get("/")
 def root():
-    # Railway root probe
+    # Root always returns 200
     return {"status": "ok"}
 
-
-# (Optional) Prometheus metrics
+# (optional) Prometheus metrics
 app.mount("/metrics", make_asgi_app())
