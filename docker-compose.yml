@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - PORT=8000
+    volumes:
+      - .:/app
+    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: .
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    volumes:
+      - .:/app
+    command: celery -A app.celery.celery worker --loglevel=info
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  scheduler:
+    build: .
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    volumes:
+      - .:/app
+    command: python -m app.scheduler
+    depends_on:
+      redis:
+        condition: service_healthy
