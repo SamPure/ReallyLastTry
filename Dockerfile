@@ -20,7 +20,7 @@ ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
 # expose the port for clarity
-EXPOSE ${PORT:-8000}
+EXPOSE 8000
 
 # start uvicorn on the Railway-provided port (defaults to 8000 locally)
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
