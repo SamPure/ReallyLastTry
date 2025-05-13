@@ -4,11 +4,12 @@ from app.config import settings
 
 logger = logging.getLogger("lead_followup.email_service")
 
+
 class EmailService:
     def __init__(self):
         self.client = httpx.Client(
             base_url="https://api.email-provider.com",  # Replace with your provider
-            headers={"Authorization": f"Bearer {settings.EMAIL_API_KEY}"}
+            headers={"Authorization": f"Bearer {settings.EMAIL_API_KEY}"},
         )
 
     def send_email(self, to: str, subject: str, body: str) -> None:
@@ -19,8 +20,8 @@ class EmailService:
                     "to": to,
                     "from": settings.EMAIL_SENDER,
                     "subject": subject,
-                    "text": body
-                }
+                    "text": body,
+                },
             )
             response.raise_for_status()
             logger.info(f"Email sent to {to}: {subject}")

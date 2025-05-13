@@ -3,6 +3,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 
+
 def setup_tracing():
     trace.set_tracer_provider(TracerProvider())
     otlp_exporter = OTLPSpanExporter()

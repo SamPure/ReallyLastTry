@@ -25,8 +25,7 @@ from app.utils.date_utils import format_date
 # Structured logging
 logger = logging.getLogger("lead_followup.analyze")
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 
 
@@ -49,9 +48,12 @@ def compute_stats(leads: List[Lead]) -> Dict[str, int]:
     """Compute top-level metrics and pull today's follow-up count from Supabase."""
     # Base metrics
     total = len(leads)
-    brokers_on = sum(1 for l in leads if (l.broker_status or "").strip().lower() == "on")
+    brokers_on = sum(
+        1 for l in leads if (l.broker_status or "").strip().lower() == "on"
+    )
     docs_req = sum(
-        1 for l in leads
+        1
+        for l in leads
         if l.last_update and l.last_update.lower().startswith("requested docs")
     )
 
@@ -99,14 +101,10 @@ def main():
         "--output",
         "-o",
         required=True,
-        help="Output file path (e.g. stats.json or stats.csv)"
+        help="Output file path (e.g. stats.json or stats.csv)",
     )
     parser.add_argument(
-        "--format",
-        "-f",
-        choices=["json", "csv"],
-        default="json",
-        help="Export format"
+        "--format", "-f", choices=["json", "csv"], default="json", help="Export format"
     )
     args = parser.parse_args()
 

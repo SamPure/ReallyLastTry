@@ -18,9 +18,10 @@ logger = logging.getLogger("lead_followup.scheduler")
 task_duration = Histogram(
     "lead_task_duration_seconds",
     "Time taken to process each lead",
-    buckets=[0.1, 0.5, 1.0, 2.0, 5.0]
+    buckets=[0.1, 0.5, 1.0, 2.0, 5.0],
 )
 task_errors = Counter("lead_task_errors_total", "Lead processing failures")
+
 
 @celery.task(name="app.scheduler.process_lead_task")
 def process_lead_task(lead_data: dict) -> None:
@@ -42,11 +43,7 @@ def process_lead_task(lead_data: dict) -> None:
 
         # Log to Supabase after successful enqueue
         supabase_service.log_followup(
-            lead.row_number,
-            "email_sms",
-            today_str,
-            lead.first_name,
-            lead.company or ""
+            lead.row_number, "email_sms", today_str, lead.first_name, lead.company or ""
         )
 
     except Exception as e:
@@ -55,6 +52,7 @@ def process_lead_task(lead_data: dict) -> None:
         raise
     finally:
         task_duration.observe(time.time() - start_time)
+
 
 @celery.task(name="app.scheduler.flush_and_summary")
 def flush_and_summary(results: List[dict]) -> None:
@@ -66,7 +64,7 @@ def flush_and_summary(results: List[dict]) -> None:
         EmailService().send_email(
             settings.EMAIL_DAILY_REPORT_TO,
             "Critical: Sheets Batch Update Failed",
-            f"Could not batch update: {e}"
+            f"Could not batch update: {e}",
         )
         return
 
@@ -80,8 +78,9 @@ def flush_and_summary(results: List[dict]) -> None:
         EmailService().send_email(
             settings.EMAIL_DAILY_REPORT_TO,
             "Critical: Summary Generation Failed",
-            f"Could not generate summary: {e}"
+            f"Could not generate summary: {e}",
         )
+
 
 @celery.task(name="app.scheduler.handle_chord_error")
 def handle_chord_error(request, exc, traceback):
@@ -89,8 +88,9 @@ def handle_chord_error(request, exc, traceback):
     EmailService().send_email(
         settings.EMAIL_DAILY_REPORT_TO,
         "Critical: Daily Follow-up Failed",
-        f"Chord failed: {exc}\n{traceback}"
+        f"Chord failed: {exc}\n{traceback}",
     )
+
 
 def run_daily_followups():
     try:
@@ -101,7 +101,7 @@ def run_daily_followups():
         EmailService().send_email(
             settings.EMAIL_DAILY_REPORT_TO,
             "Critical: Redis Down",
-            f"Could not flush Redis: {e}"
+            f"Could not flush Redis: {e}",
         )
         return
 
@@ -113,7 +113,7 @@ def run_daily_followups():
         EmailService().send_email(
             settings.EMAIL_DAILY_REPORT_TO,
             "Critical: Sheets Down",
-            f"Could not fetch leads: {e}"
+            f"Could not fetch leads: {e}",
         )
         return
 
@@ -122,6 +122,7 @@ def run_daily_followups():
     chord(task_group, flush_and_summary.s()).apply_async(
         link_error=handle_chord_error.s()
     )
+
 
 if __name__ == "__main__":
     run_daily_followups()

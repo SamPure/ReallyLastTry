@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 
+
 class Lead(BaseModel):
     row_number: int
     first_name: str = Field(..., alias="First Name")

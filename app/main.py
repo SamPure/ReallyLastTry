@@ -20,8 +20,9 @@ logging.getLogger().handlers = [logHandler]
 logging.getLogger().setLevel(logging.INFO)
 
 # System metrics
-memory_usage = Gauge('memory_usage_bytes', 'Memory usage in bytes')
-cpu_usage = Gauge('cpu_usage_percent', 'CPU usage in percent')
+memory_usage = Gauge("memory_usage_bytes", "Memory usage in bytes")
+cpu_usage = Gauge("cpu_usage_percent", "CPU usage in percent")
+
 
 @app.get("/health")
 def health():
@@ -31,7 +32,9 @@ def health():
         redis.ping()
 
         # Check Supabase connection
-        settings.supabase_client.table("followup_logs").select("count").limit(1).execute()
+        settings.supabase_client.table("followup_logs").select("count").limit(
+            1
+        ).execute()
 
         # Update system metrics
         memory_usage.set(psutil.Process().memory_info().rss)
@@ -44,11 +47,12 @@ def health():
             "system": {
                 "python": platform.python_version(),
                 "memory_usage": f"{psutil.Process().memory_info().rss / 1024 / 1024:.1f}MB",
-                "cpu_usage": f"{psutil.cpu_percent()}%"
-            }
+                "cpu_usage": f"{psutil.cpu_percent()}%",
+            },
         }
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))
+
 
 # Prometheus metrics
 app.mount("/metrics", make_asgi_app())

@@ -14,15 +14,16 @@ logger = logging.getLogger("lead_followup.batch_processor")
 batch_size = Histogram(
     "sheets_batch_size",
     "Number of cells in each batch update",
-    buckets=[10, 50, 100, 500, 1000]
+    buckets=[10, 50, 100, 500, 1000],
 )
 batch_duration = Histogram(
     "sheets_batch_duration_seconds",
     "Time taken to process each batch",
-    buckets=[0.1, 0.5, 1.0, 2.0, 5.0]
+    buckets=[0.1, 0.5, 1.0, 2.0, 5.0],
 )
 redis_errors = Counter("redis_errors_total", "Redis operation failures")
 sheets_errors = Counter("sheets_errors_total", "Sheets operation failures")
+
 
 class BatchProcessor:
     def __init__(self, chunk_size: Optional[int] = None):
@@ -56,7 +57,7 @@ class BatchProcessor:
 
         # Process in chunks with exponential backoff
         for i in range(0, len(cell_list), self.chunk_size):
-            chunk = cell_list[i:i + self.chunk_size]
+            chunk = cell_list[i : i + self.chunk_size]
             chunk_start = time.time()
 
             @with_retry(error_counter=sheets_errors)

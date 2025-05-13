@@ -2,6 +2,7 @@ from datetime import datetime
 import pytz
 from app.config import settings
 
+
 def get_timezone_from_area_code(area_code: str) -> str:
     area_code = (area_code or "").strip()
     if not area_code:
@@ -15,6 +16,7 @@ def get_timezone_from_area_code(area_code: str) -> str:
         # Add more mappings
     }
     return timezone_map.get(area_code, "UTC")
+
 
 def now_in_timezone(area_code: str) -> datetime:
     tz = get_timezone_from_area_code(area_code)

@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings
 from functools import lru_cache
 from supabase import create_client
 
+
 class Settings(BaseSettings):
     # Core settings
     ENVIRONMENT: str = "production"
@@ -51,5 +52,6 @@ class Settings(BaseSettings):
     @property
     def google_credentials(self):
         return json.loads(self.GOOGLE_CREDENTIALS)
+
 
 settings = Settings()
