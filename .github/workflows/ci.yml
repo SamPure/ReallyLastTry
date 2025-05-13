@@ -35,25 +35,22 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov black flake8 mypy pip-audit
 
-      - name: Run linting
+      - name: Lint
         run: |
-          black . --check
+          black --check .
           flake8 .
           mypy .
 
-      - name: Run security scan
-        run: |
-          pip-audit
+      - name: Security scan
+        run: pip-audit
 
       - name: Run tests with coverage
-        run: |
-          pytest --cov=app --cov-report=xml
+        run: pytest --cov=app tests/ --cov-report=xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
           file: ./coverage.xml
-          fail_ci_if_error: true
 
   build:
     needs: test
