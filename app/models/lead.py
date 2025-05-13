@@ -1,15 +1,20 @@
-from pydantic import BaseModel, Field
+from datetime import datetime
 from typing import Optional
+from pydantic import BaseModel, Field
 
 
 class Lead(BaseModel):
-    row_number: int
-    first_name: str = Field(..., alias="First Name")
-    phone_number: str = Field(..., alias="Phone Number")
-    area_code: str = Field(default="", alias="Area Code")
-    company: Optional[str] = Field(default=None, alias="Company")
-    email: Optional[str] = Field(default=None, alias="Email")
-    last_texted: Optional[str] = Field(default=None, alias="Last Texted")
-    status_update: Optional[str] = Field(default=None, alias="Status Update")
-    ai_summary: Optional[str] = Field(default=None, alias="AI SUMMARY")
-    broker_status: Optional[str] = Field(default=None, alias="Broker Status")
+    """Model for a lead from Google Sheets."""
+    id: str = Field(..., description="Unique identifier for the lead")
+    name: str = Field(..., description="Lead's full name")
+    email: str = Field(..., description="Lead's email address")
+    phone: str = Field(..., description="Lead's phone number")
+    created_at: datetime = Field(..., description="When the lead was created")
+    last_contacted: Optional[datetime] = Field(None, description="Last follow-up attempt")
+    status: str = Field(..., description="Current lead status")
+    notes: Optional[str] = Field(None, description="Additional notes about the lead")
+
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
