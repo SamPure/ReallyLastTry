@@ -1,0 +1,31 @@
+# Bandit configuration file
+# See: https://bandit.readthedocs.io/en/latest/config.html
+
+# Skip specific tests
+skips: ['B101']  # assert_used
+
+# Set minimum severity level
+severity: LOW
+confidence: LOW
+
+# Exclude specific directories
+exclude_dirs: ['tests', 'venv', '.venv', 'env', '.env']
+
+# Include specific files
+include: ['*.py']
+
+# Custom test settings
+test_setting:
+  no_shell: True
+  subprocess: False
+  no_assert: True
+  no_debug: True
+  no_hardcoded_password: True
+  no_hardcoded_password_string: True
+  no_hardcoded_password_default: True
+  no_hardcoded_password_funcarg: True
+  no_hardcoded_password_keyword: True
+  no_hardcoded_password_string: True
+  no_hardcoded_password_default: True
+  no_hardcoded_password_funcarg: True
+  no_hardcoded_password_keyword: True
