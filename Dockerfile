@@ -5,6 +5,7 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
+    make \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
@@ -20,7 +21,7 @@ ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
 # expose the port for clarity
-EXPOSE 8000
+EXPOSE ${PORT:-8000}
 
 # start uvicorn on the Railway-provided port (defaults to 8000 locally)
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
