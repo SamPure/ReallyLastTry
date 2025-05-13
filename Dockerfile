@@ -23,5 +23,5 @@ ENV PYTHONUNBUFFERED=1
 # expose the port for clarity
 EXPOSE 8000
 
-# ▶️ Listen on Railway's dynamic $PORT
+# ▶️ Listen on Railway's injected $PORT (fallback to 8000 locally)
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
