@@ -18,8 +18,8 @@ class Settings(BaseSettings):
 
     # Email
     EMAIL_SENDER: str
-    EMAIL_API_KEY: str
-    EMAIL_DAILY_REPORT_TO: str
+    EMAIL_API_KEY: Optional[str] = None
+    EMAIL_DAILY_REPORT_TO: Optional[str] = None
 
     # SMS
     KIXIE_API_KEY: str
@@ -34,7 +34,7 @@ class Settings(BaseSettings):
 
     # Supabase
     SUPABASE_URL: str
-    SUPABASE_KEY: str
+    SUPABASE_KEY: Optional[str] = None
 
     # Batch processing
     BATCH_CHUNK_SIZE: int = 500
@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     @property
     @lru_cache()
     def supabase_client(self):
+        if not self.SUPABASE_URL or not self.SUPABASE_KEY:
+            return None
         return create_client(self.SUPABASE_URL, self.SUPABASE_KEY)
 
     @property
