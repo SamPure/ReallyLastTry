@@ -2,12 +2,15 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 import logging
 from supabase import create_client, Client
-from app.core.config import settings
+from app.services.config_manager import get_settings
 from pydantic import BaseModel
 from functools import wraps
 import time
 
 logger = logging.getLogger(__name__)
+
+# Initialize settings
+settings = get_settings()
 
 def retry_on_failure(times: int = 3, delay: float = 1.0):
     """Decorator for retrying failed Supabase operations with exponential backoff."""

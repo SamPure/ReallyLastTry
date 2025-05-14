@@ -1,9 +1,9 @@
 import logging
 import sys
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pythonjsonlogger import jsonlogger
-from prometheus_client import make_asgi_app
+from prometheus_client import make_asgi_app, generate_latest, CONTENT_TYPE_LATEST
 from typing import Optional, Dict
 import json
 from datetime import datetime
@@ -15,7 +15,11 @@ from app.jobs.sheet_sync import sheet_sync
 from fastapi.responses import JSONResponse
 from app.services.config_manager import get_settings
 from app.jobs.email_scheduler import start_email_scheduler, stop_email_scheduler
-from app.services.email_service import email_service
+from app.services.email_service import email_service, EmailService
+from app.services.kixie_handler import KixieHandler
+from app.services.google_sheets import GoogleSheetsService
+from app.jobs.scheduler_service import SchedulerService
+import time
 
 # Set up logging first
 logger = logging.getLogger(__name__)
@@ -67,6 +71,12 @@ app.add_middleware(
 metrics_app = make_asgi_app()
 app.mount("/metrics", metrics_app)
 
+# Initialize services
+email_service = EmailService()
+kixie_handler = KixieHandler()
+sheets_service = GoogleSheetsService()
+scheduler_service = SchedulerService()
+
 # Include routers
 app.include_router(leads.router)
 app.include_router(messaging.router)
@@ -86,6 +96,10 @@ async def startup_event():
         # Start email scheduler
         start_email_scheduler()
         logger.info("Application startup complete")
+
+        # Initialize scheduler
+        await scheduler_service.initialize()
+        logger.info("Scheduler initialized successfully")
     except Exception as e:
         logger.error(f"Error during startup: {str(e)}")
         raise
@@ -101,6 +115,10 @@ async def shutdown_event():
         # Stop email scheduler
         stop_email_scheduler()
         logger.info("Application shutdown complete")
+
+        # Cleanup scheduler
+        await scheduler_service.cleanup()
+        logger.info("Scheduler cleaned up successfully")
     except Exception as e:
         logger.error(f"Error during shutdown: {str(e)}")
 
@@ -170,6 +188,15 @@ async def global_exception_handler(request: Request, exc: Exception):
             "timestamp": datetime.utcnow().isoformat()
         }
     )
+
+# Request timing middleware
+@app.middleware("http")
+async def add_timing_header(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    response.headers["X-Process-Time"] = str(process_time)
+    return response
 
 if __name__ == "__main__":
     import uvicorn
