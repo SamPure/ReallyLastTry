@@ -37,8 +37,8 @@ class SheetSync:
             )
             self.client = gspread.authorize(credentials)
 
-            if settings.GOOGLE_SHEETS_ID:
-                spreadsheet = self.client.open_by_key(settings.GOOGLE_SHEETS_ID)
+            if settings.SHEET_ID:
+                spreadsheet = self.client.open_by_key(settings.SHEET_ID)
                 self.worksheet = spreadsheet.worksheet(settings.LEADS_SHEET_NAME)
                 logger.info("Google Sheets client initialized successfully")
             else:
@@ -118,12 +118,12 @@ class SheetSync:
 
     def sync_broker_tone_settings(self) -> Dict[str, Any]:
         """Sync broker tone settings from a dedicated worksheet."""
-        if not self.client or not settings.GOOGLE_SHEETS_ID:
+        if not self.client or not settings.SHEET_ID:
             logger.warning("Google Sheets client not initialized")
             return {}
 
         try:
-            spreadsheet = self.client.open_by_key(settings.GOOGLE_SHEETS_ID)
+            spreadsheet = self.client.open_by_key(settings.SHEET_ID)
             tone_worksheet = spreadsheet.worksheet("BrokerTones")
 
             # Get all tone settings

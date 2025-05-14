@@ -19,7 +19,7 @@ class GoogleSheetsService:
         creds_info = json.loads(settings.GOOGLE_SHEETS_CREDENTIALS_JSON)
         creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
         self.client = build("sheets", "v4", credentials=creds)
-        self.sheet_id = settings.GOOGLE_SHEETS_ID
+        self.sheet_id = settings.SHEET_ID
         # Ranges pulled from settings—no hard-coded strings here
         self.ranges = {
             "leads": f"{settings.LEADS_SHEET_NAME}!{settings.GOOGLE_SHEETS_LEADS_RANGE}",

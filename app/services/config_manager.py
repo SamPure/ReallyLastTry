@@ -21,14 +21,14 @@ class Settings(BaseSettings):
 
     # Supabase
     SUPABASE_URL: str
-    SUPABASE_KEY: Optional[str] = None
+    SUPABASE_SERVICE_KEY: Optional[str] = None
 
     # Google Sheets
-    GOOGLE_SHEETS_ID: Optional[str] = None
-    GOOGLE_SERVICE_ACCOUNT_INFO: Optional[str] = None
+    SHEET_ID: Optional[str] = None
+    GOOGLE_CREDENTIALS: Optional[str] = None
 
     # Email Configuration
-    EMAIL_FROM: Optional[str] = None
+    EMAIL_SENDER: Optional[str] = None
     EMAIL_START_HOUR: int = 9
     EMAIL_END_HOUR: int = 17
     EMAIL_BATCH_SIZE: int = 50
@@ -37,10 +37,10 @@ class Settings(BaseSettings):
 
     # Kixie SMS
     KIXIE_API_KEY: str
-    KIXIE_WEBHOOK_SECRET: Optional[str] = None
+    # KIXIE_WEBHOOK_SECRET: Optional[str] = None  # remove or keep if needed
 
     # JWT
-    JWT_SECRET: Optional[str] = None
+    # JWT_SECRET: Optional[str] = None  # remove or keep if needed
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     BATCH_SIZE: int = 100
     BATCH_DELAY: int = 1
 
-    @validator("GOOGLE_SERVICE_ACCOUNT_INFO", pre=True)
+    @validator("GOOGLE_CREDENTIALS", pre=True)
     def parse_google_credentials(cls, v):
         """Parse Google service account credentials from JSON string if needed."""
         if isinstance(v, str):

@@ -16,9 +16,9 @@ class Settings(BaseSettings):
     DEFAULT_AREA_CODE: str = "212"
 
     # Google Sheets
-    GOOGLE_SHEETS_CREDENTIALS: Optional[str] = None
-    GOOGLE_SHEETS_TOKEN: Optional[str] = None
-    GOOGLE_SHEETS_ID: Optional[str] = None
+    SHEET_ID: Optional[str] = None
+    GOOGLE_CREDENTIALS: Optional[str] = None
+    EMAIL_SENDER: Optional[str] = None
     LEADS_SHEET_NAME: str = "AllLeads"
 
     # Email (Gmail)
@@ -49,10 +49,10 @@ class Settings(BaseSettings):
         env_file = ".env"
         case_sensitive = True
 
-    @validator("GOOGLE_SHEETS_ID")
+    @validator("SHEET_ID")
     def validate_sheet_id(cls, v):
         if v and len(v) < 10:  # Only validate if value is provided
-            raise ValueError("GOOGLE_SHEETS_ID must be a valid Google Sheet ID")
+            raise ValueError("SHEET_ID must be a valid Google Sheet ID")
         return v
 
     @validator("GMAIL_USER")
@@ -91,12 +91,10 @@ class Settings(BaseSettings):
     def validate_optional_settings(self) -> None:
         """Validate optional settings and log warnings for missing values."""
         # Google Sheets
-        if not self.GOOGLE_SHEETS_CREDENTIALS:
-            logger.warning("GOOGLE_SHEETS_CREDENTIALS is missing—Google Sheets features will be disabled!")
-        if not self.GOOGLE_SHEETS_TOKEN:
-            logger.warning("GOOGLE_SHEETS_TOKEN is missing—Google Sheets features will be disabled!")
-        if not self.GOOGLE_SHEETS_ID:
-            logger.warning("GOOGLE_SHEETS_ID is missing—Google Sheets features will be disabled!")
+        if not self.GOOGLE_CREDENTIALS:
+            logger.warning("GOOGLE_CREDENTIALS is missing—Google Sheets features will be disabled!")
+        if not self.SHEET_ID:
+            logger.warning("SHEET_ID is missing—Google Sheets features will be disabled!")
 
         # Email
         if not self.EMAIL_PASSWORD:
@@ -136,7 +134,7 @@ class Settings(BaseSettings):
         logger.info(f"Max Retries: {self.MAX_RETRIES}")
         logger.info(f"Email Features: {'Enabled' if self.EMAIL_PASSWORD else 'Disabled'}")
         logger.info(f"Supabase Features: {'Enabled' if self.SUPABASE_SERVICE_KEY else 'Disabled'}")
-        logger.info(f"Google Sheets Integration: {'Enabled' if self.GOOGLE_SHEETS_CREDENTIALS else 'Disabled'}")
+        logger.info(f"Google Sheets Integration: {'Enabled' if self.GOOGLE_CREDENTIALS else 'Disabled'}")
         logger.info(f"SMS Features: {'Enabled' if self.KIXIE_API_KEY else 'Disabled'}")
 
 

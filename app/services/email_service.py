@@ -65,7 +65,7 @@ class EmailService:
         try:
             # Load service account credentials
             credentials = service_account.Credentials.from_service_account_info(
-                settings.GOOGLE_SERVICE_ACCOUNT_INFO,
+                settings.GOOGLE_CREDENTIALS,
                 scopes=['https://www.googleapis.com/auth/gmail.send']
             )
 
@@ -179,7 +179,7 @@ class EmailService:
         """Create an email message with optional templating."""
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"] = settings.EMAIL_FROM
+        msg["From"] = settings.EMAIL_SENDER
         msg["To"] = to
 
         if template_name and template_data:
