@@ -29,12 +29,11 @@ class Settings(BaseSettings):
     EMAIL_PASSWORD: Optional[str] = None
     REPORT_EMAIL: Optional[str] = None
 
-    # SMS
-    TWILIO_ACCOUNT_SID: Optional[str] = None
-    TWILIO_AUTH_TOKEN: Optional[str] = None
-    TWILIO_PHONE_NUMBER: Optional[str] = None
+    # SMS (Kixie)
+    KIXIE_API_KEY: Optional[str] = None
+    KIXIE_BASE_URL: Optional[str] = None
 
-    # Infrastructure
+    # Infrastructure (Optional)
     REDIS_URL: Optional[str] = None
     REDIS_PASSWORD: Optional[str] = None
     REDIS_PORT: int = 6379
@@ -71,10 +70,10 @@ class Settings(BaseSettings):
                 raise ValueError("GMAIL_USER must be a valid email address")
         return v
 
-    @validator("TWILIO_ACCOUNT_SID")
+    @validator("KIXIE_API_KEY")
     def validate_kixie_key(cls, v):
         if v and len(v) < 10:  # Only validate if value is provided
-            raise ValueError("TWILIO_ACCOUNT_SID must be a valid API key")
+            raise ValueError("KIXIE_API_KEY must be a valid API key")
         return v
 
     @validator("SUPABASE_URL")
@@ -98,30 +97,37 @@ class Settings(BaseSettings):
 
     def validate_optional_settings(self) -> None:
         """Validate optional settings and log warnings for missing values."""
+        # Google Sheets
         if not self.GOOGLE_SHEETS_CREDENTIALS:
             logger.warning("GOOGLE_SHEETS_CREDENTIALS is missing—Google Sheets features will be disabled!")
         if not self.GOOGLE_SHEETS_TOKEN:
             logger.warning("GOOGLE_SHEETS_TOKEN is missing—Google Sheets features will be disabled!")
         if not self.GOOGLE_SHEETS_ID:
             logger.warning("GOOGLE_SHEETS_ID is missing—Google Sheets features will be disabled!")
+
+        # Email
         if not self.EMAIL_PASSWORD:
             logger.warning("EMAIL_PASSWORD is missing—email features will be disabled!")
         if not self.REPORT_EMAIL:
             logger.warning("REPORT_EMAIL is missing—daily reports will be disabled!")
-        if not self.TWILIO_ACCOUNT_SID:
-            logger.warning("TWILIO_ACCOUNT_SID is missing—SMS features will be disabled!")
-        if not self.TWILIO_AUTH_TOKEN:
-            logger.warning("TWILIO_AUTH_TOKEN is missing—SMS features will be disabled!")
-        if not self.TWILIO_PHONE_NUMBER:
-            logger.warning("TWILIO_PHONE_NUMBER is missing—SMS features will be disabled!")
+
+        # SMS (Kixie)
+        if not self.KIXIE_API_KEY:
+            logger.warning("KIXIE_API_KEY is missing—SMS features will be disabled!")
+        if not self.KIXIE_BASE_URL:
+            logger.warning("KIXIE_BASE_URL is missing—SMS features will be disabled!")
+
+        # Infrastructure (Optional)
         if not self.REDIS_URL:
             logger.warning("REDIS_URL is missing—Redis features will be disabled!")
         if not self.REDIS_PASSWORD:
             logger.warning("REDIS_PASSWORD is missing—Redis features will be disabled!")
-        if not self.SUPABASE_SERVICE_KEY:
-            logger.warning("SUPABASE_SERVICE_KEY is missing—Supabase features will be disabled!")
         if not self.OTLP_ENDPOINT:
             logger.warning("OTLP_ENDPOINT is missing—distributed tracing will be disabled!")
+
+        # Supabase
+        if not self.SUPABASE_SERVICE_KEY:
+            logger.warning("SUPABASE_SERVICE_KEY is missing—Supabase features will be disabled!")
 
     @property
     @lru_cache()
@@ -147,6 +153,7 @@ class Settings(BaseSettings):
         logger.info(f"Email Features: {'Enabled' if self.EMAIL_PASSWORD else 'Disabled'}")
         logger.info(f"Supabase Features: {'Enabled' if self.SUPABASE_SERVICE_KEY else 'Disabled'}")
         logger.info(f"Google Sheets Integration: {'Enabled' if self.GOOGLE_SHEETS_CREDENTIALS else 'Disabled'}")
+        logger.info(f"SMS Features: {'Enabled' if self.KIXIE_API_KEY else 'Disabled'}")
         logger.info(f"Distributed Tracing: {'Enabled' if self.OTLP_ENDPOINT else 'Disabled'}")
 
 
