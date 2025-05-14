@@ -21,14 +21,14 @@ class Settings(BaseSettings):
 
     # Supabase
     SUPABASE_URL: str
-    SUPABASE_KEY: str
+    SUPABASE_KEY: Optional[str] = None
 
     # Google Sheets
-    GOOGLE_SHEETS_ID: str
-    GOOGLE_SERVICE_ACCOUNT_INFO: Dict[str, Any]
+    GOOGLE_SHEETS_ID: Optional[str] = None
+    GOOGLE_SERVICE_ACCOUNT_INFO: Optional[str] = None
 
     # Email Configuration
-    EMAIL_FROM: EmailStr
+    EMAIL_FROM: Optional[str] = None
     EMAIL_START_HOUR: int = 9
     EMAIL_END_HOUR: int = 17
     EMAIL_BATCH_SIZE: int = 50
@@ -37,10 +37,10 @@ class Settings(BaseSettings):
 
     # Kixie SMS
     KIXIE_API_KEY: str
-    KIXIE_WEBHOOK_SECRET: str
+    KIXIE_WEBHOOK_SECRET: Optional[str] = None
 
     # JWT
-    JWT_SECRET: str
+    JWT_SECRET: Optional[str] = None
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
