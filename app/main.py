@@ -23,7 +23,11 @@ except Exception as e:
 
 # Setup tracing
 try:
-    setup_tracing()
+    if settings and settings.OTLP_ENDPOINT:
+        setup_tracing()
+        logger.info(f"OpenTelemetry tracing enabled with endpoint: {settings.OTLP_ENDPOINT}")
+    else:
+        logger.warning("OpenTelemetry tracing disabled - no OTLP endpoint configured")
 except Exception as e:
     logging.warning(f"Tracing setup failed: {e}")
 
@@ -104,13 +108,18 @@ app.add_middleware(
 trace.set_tracer_provider(TracerProvider())
 tracer = trace.get_tracer(__name__)
 
-# Configure OTLP exporter
-otlp_exporter = OTLPSpanExporter(
-    endpoint=settings.OTLP_ENDPOINT,
-    insecure=True
-)
-span_processor = BatchSpanProcessor(otlp_exporter)
-trace.get_tracer_provider().add_span_processor(span_processor)
+# Configure OTLP exporter if endpoint is available
+if settings and settings.OTLP_ENDPOINT:
+    try:
+        otlp_exporter = OTLPSpanExporter(
+            endpoint=settings.OTLP_ENDPOINT,
+            insecure=True
+        )
+        span_processor = BatchSpanProcessor(otlp_exporter)
+        trace.get_tracer_provider().add_span_processor(span_processor)
+        logger.info("OTLP exporter configured successfully")
+    except Exception as e:
+        logger.error(f"Failed to configure OTLP exporter: {e}")
 
 # Instrument FastAPI
 FastAPIInstrumentor.instrument_app(

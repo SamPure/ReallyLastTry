@@ -4,7 +4,7 @@ import logging
 import re
 from typing import Optional, Dict, Any, Union
 from pydantic_settings import BaseSettings
-from pydantic import validator, root_validator
+from pydantic import validator, model_validator
 from functools import lru_cache
 from supabase import create_client
 
@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
     PROMETHEUS_PORT: int = 8001
     CELERY_BROKER_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    OTLP_ENDPOINT: Optional[str] = None  # Optional OTLP endpoint for tracing
 
     # Supabase
     SUPABASE_URL: str
@@ -81,18 +82,18 @@ class Settings(BaseSettings):
             raise ValueError("SUPABASE_URL must be a valid HTTPS URL")
         return v
 
-    @root_validator
-    def validate_related_settings(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+    @model_validator(mode="after")
+    def validate_related_settings(self) -> 'Settings':
         """Validate that related settings are consistent."""
         # If email features are enabled, ensure sender is set
-        if values.get("EMAIL_PASSWORD") and not values.get("GMAIL_USER"):
+        if self.EMAIL_PASSWORD and not self.GMAIL_USER:
             raise ValueError("GMAIL_USER must be set when EMAIL_PASSWORD is provided")
 
         # If Supabase is enabled, ensure URL is valid
-        if values.get("SUPABASE_SERVICE_KEY") and not values.get("SUPABASE_URL"):
+        if self.SUPABASE_SERVICE_KEY and not self.SUPABASE_URL:
             raise ValueError("SUPABASE_URL must be set when SUPABASE_SERVICE_KEY is provided")
 
-        return values
+        return self
 
     def validate_optional_settings(self) -> None:
         """Validate optional settings and log warnings for missing values."""
@@ -102,6 +103,8 @@ class Settings(BaseSettings):
             logger.warning("REPORT_EMAIL is missing—daily reports will be disabled!")
         if not self.SUPABASE_SERVICE_KEY:
             logger.warning("SUPABASE_SERVICE_KEY is missing—Supabase features will be disabled!")
+        if not self.OTLP_ENDPOINT:
+            logger.warning("OTLP_ENDPOINT is missing—distributed tracing will be disabled!")
 
     @property
     @lru_cache()
@@ -127,6 +130,7 @@ class Settings(BaseSettings):
         logger.info(f"Email Features: {'Enabled' if self.EMAIL_PASSWORD else 'Disabled'}")
         logger.info(f"Supabase Features: {'Enabled' if self.SUPABASE_SERVICE_KEY else 'Disabled'}")
         logger.info(f"Google Sheets Integration: {'Enabled' if self.GOOGLE_SHEETS_CREDENTIALS else 'Disabled'}")
+        logger.info(f"Distributed Tracing: {'Enabled' if self.OTLP_ENDPOINT else 'Disabled'}")
 
 
 # Initialize settings and validate optional values
