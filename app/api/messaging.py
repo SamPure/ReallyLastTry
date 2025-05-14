@@ -5,7 +5,7 @@ from datetime import datetime
 from app.api.dependencies import get_current_active_user, get_current_admin_user
 from app.services.kixie_handler import kixie_handler
 from app.services.email_service import email_service
-from app.services.supabase_client import supabase
+from app.services.supabase_client import supabase_client
 
 router = APIRouter(prefix="/messaging", tags=["messaging"])
 
@@ -91,7 +91,7 @@ async def get_conversations(
     """Get all conversations for a lead."""
     try:
         # Get conversations from Supabase
-        result = supabase.client.table("conversations").select("*").eq("lead_id", lead_id).execute()
+        result = supabase_client.client.table("conversations").select("*").eq("lead_id", lead_id).execute()
         conversations = result.data or []
         return conversations
     except Exception as e:

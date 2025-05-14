@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from datetime import datetime
 from app.api.dependencies import get_current_active_user, get_current_admin_user
-from app.services.supabase_client import supabase
+from app.services.supabase_client import supabase_client
 from app.models.priority import priority_scorer
 from app.jobs.sheet_sync import sheet_sync
 
@@ -47,7 +47,7 @@ async def get_leads(
     """Get a list of leads with optional filtering."""
     try:
         # Get leads from Supabase
-        query = supabase.client.table("leads").select("*")
+        query = supabase_client.client.table("leads").select("*")
 
         if status:
             query = query.eq("status", status)
@@ -74,7 +74,7 @@ async def get_priority_leads(
     """Get a batch of leads sorted by priority score."""
     try:
         # Get all active leads
-        result = supabase.client.table("leads").select("*").eq("status", "Active").execute()
+        result = supabase_client.client.table("leads").select("*").eq("status", "Active").execute()
         leads = result.data or []
 
         # Get priority batch
@@ -93,7 +93,7 @@ async def get_lead(
 ):
     """Get a specific lead by ID."""
     try:
-        lead = supabase.get_lead_details(lead_id)
+        lead = supabase_client.get_lead_details(lead_id)
         if not lead:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -119,7 +119,7 @@ async def create_lead(
     """Create a new lead."""
     try:
         # Insert into Supabase
-        result = supabase.client.table("leads").insert(lead.dict()).execute()
+        result = supabase_client.client.table("leads").insert(lead.dict()).execute()
         new_lead = result.data[0] if result.data else None
 
         if not new_lead:
@@ -154,7 +154,7 @@ async def update_lead(
     """Update a lead."""
     try:
         # Update in Supabase
-        result = supabase.client.table("leads").update(
+        result = supabase_client.client.table("leads").update(
             lead_update.dict(exclude_unset=True)
         ).eq("id", lead_id).execute()
 
@@ -190,7 +190,7 @@ async def delete_lead(
     """Delete a lead."""
     try:
         # Delete from Supabase
-        result = supabase.client.table("leads").delete().eq("id", lead_id).execute()
+        result = supabase_client.client.table("leads").delete().eq("id", lead_id).execute()
 
         if not result.data:
             raise HTTPException(
