@@ -15,6 +15,7 @@ from app.jobs.sheet_sync import sheet_sync
 from fastapi.responses import JSONResponse
 from app.services.config_manager import get_settings
 from app.jobs.email_scheduler import start_email_scheduler, stop_email_scheduler
+from app.services.email_service import email_service
 
 # Set up logging first
 logger = logging.getLogger(__name__)
@@ -62,6 +63,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount Prometheus metrics
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
+
 # Include routers
 app.include_router(leads.router)
 app.include_router(messaging.router)
@@ -102,11 +107,57 @@ async def shutdown_event():
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
-        "version": "1.0.0"
-    }
+    try:
+        # Check Supabase connection
+        supabase_status = "healthy" if await supabase.is_connected() else "unhealthy"
+
+        # Check email service
+        email_status = "healthy" if email_service.is_healthy() else "unhealthy"
+
+        # Check Google Sheets sync
+        sheets_status = "healthy" if sheet_sync.is_healthy() else "unhealthy"
+
+        return {
+            "status": "healthy" if all(s == "healthy" for s in [supabase_status, email_status, sheets_status]) else "degraded",
+            "timestamp": datetime.utcnow().isoformat(),
+            "version": "1.0.0",
+            "components": {
+                "supabase": supabase_status,
+                "email_service": email_status,
+                "sheets_sync": sheets_status
+            }
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return {
+            "status": "unhealthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "version": "1.0.0",
+            "error": str(e)
+        }
+
+@app.get("/ready")
+async def readiness_check():
+    """Readiness check endpoint for Kubernetes/container orchestration."""
+    try:
+        # Check if all critical services are ready
+        is_ready = all([
+            await supabase.is_connected(),
+            email_service.is_healthy(),
+            sheet_sync.is_healthy()
+        ])
+
+        return {
+            "status": "ready" if is_ready else "not_ready",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Readiness check failed: {str(e)}")
+        return {
+            "status": "not_ready",
+            "timestamp": datetime.utcnow().isoformat(),
+            "error": str(e)
+        }
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):

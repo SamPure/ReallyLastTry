@@ -146,6 +146,22 @@ class SheetSync:
             logger.error(f"Failed to sync broker tone settings: {e}")
             return {}
 
+    def is_healthy(self) -> bool:
+        """Check if the Google Sheets sync service is healthy."""
+        try:
+            # Check if we have required configuration
+            if not settings.SHEET_ID or not settings.GOOGLE_CREDENTIALS:
+                return False
+
+            # Check if we have a valid credentials object
+            if not self.client or not self.client.credentials or not self.client.credentials.valid:
+                return False
+
+            return True
+        except Exception as e:
+            logger.error(f"Sheet sync health check failed: {str(e)}")
+            return False
+
 # Initialize sheet sync
 sheet_sync = SheetSync()
 

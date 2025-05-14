@@ -395,5 +395,25 @@ class EmailService:
         self.scheduler.shutdown()
         logger.info("Email scheduler stopped")
 
+    def is_healthy(self) -> bool:
+        """Check if the email service is healthy."""
+        try:
+            # Check if we have required configuration
+            if not settings.EMAIL_SENDER:
+                return False
+
+            # Check if queue processing is working
+            if len(self.email_queue) > settings.EMAIL_QUEUE_ALERT_THRESHOLD:
+                return False
+
+            # Check if we have recent successful sends
+            if self.metrics.total_sent == 0 and self.metrics.total_failed > 0:
+                return False
+
+            return True
+        except Exception as e:
+            logger.error(f"Email service health check failed: {str(e)}")
+            return False
+
 # Initialize singleton instance
 email_service = EmailService()

@@ -58,6 +58,19 @@ class SupabaseClient:
                 logger.error(f"Failed to initialize Supabase client: {e}")
                 self.client = None
 
+    async def initialize(self):
+        """Initialize the Supabase client asynchronously."""
+        if not self.client and settings.SUPABASE_URL and settings.SUPABASE_SERVICE_KEY:
+            try:
+                self.client = create_client(
+                    settings.SUPABASE_URL,
+                    settings.SUPABASE_SERVICE_KEY
+                )
+                logger.info("Supabase client initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize Supabase client: {e}")
+                self.client = None
+
     @retry_on_failure(times=3, delay=0.5)
     async def insert_conversation(
         self,
@@ -149,5 +162,18 @@ class SupabaseClient:
             logger.error(f"Failed to get lead details: {e}")
             return None
 
-# Initialize Supabase client
+    async def is_connected(self) -> bool:
+        """Check if the Supabase connection is healthy."""
+        try:
+            # Try to execute a simple query
+            await self.client.table("leads").select("count", count="exact").limit(1).execute()
+            return True
+        except Exception as e:
+            logger.error(f"Supabase health check failed: {str(e)}")
+            return False
+
+# Initialize Supabase client singleton
 supabase = SupabaseClient()
+
+# Export the singleton instance
+__all__ = ['supabase']
