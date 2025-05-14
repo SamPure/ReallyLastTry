@@ -173,7 +173,7 @@ class SupabaseClient:
             return False
 
 # Initialize Supabase client singleton
-supabase = SupabaseClient()
+supabase_client = SupabaseClient()
 
 # Export the singleton instance
-__all__ = ['supabase']
+__all__ = ['supabase_client']

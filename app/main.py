@@ -10,7 +10,7 @@ from datetime import datetime
 from app.api import leads, messaging
 from app.core.config import settings
 from app.core.logging import setup_logging
-from app.services.supabase_client import supabase
+from app.services.supabase_client import supabase_client
 from app.jobs.sheet_sync import sheet_sync
 from fastapi.responses import JSONResponse
 from app.services.config_manager import get_settings
@@ -76,7 +76,7 @@ async def startup_event():
     """Initialize services on startup."""
     try:
         # Initialize Supabase client
-        await supabase.initialize()
+        await supabase_client.initialize()
         logger.info("Supabase client initialized")
 
         # Initialize Google Sheets sync
@@ -109,7 +109,7 @@ async def health_check():
     """Health check endpoint."""
     try:
         # Check Supabase connection
-        supabase_status = "healthy" if await supabase.is_connected() else "unhealthy"
+        supabase_status = "healthy" if await supabase_client.is_connected() else "unhealthy"
 
         # Check email service
         email_status = "healthy" if email_service.is_healthy() else "unhealthy"
@@ -142,7 +142,7 @@ async def readiness_check():
     try:
         # Check if all critical services are ready
         is_ready = all([
-            await supabase.is_connected(),
+            await supabase_client.is_connected(),
             email_service.is_healthy(),
             sheet_sync.is_healthy()
         ])
