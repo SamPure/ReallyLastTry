@@ -2,7 +2,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 import logging
 from supabase import create_client, Client
-from app.services.config_manager import settings
+from app.core.config import settings
 from pydantic import BaseModel
 from functools import wraps
 import time
@@ -45,31 +45,33 @@ def retry_on_failure(times: int = 3, delay: float = 1.0):
     return decorator
 
 class SupabaseClient:
-    def __init__(self):
-        self.client: Optional[Client] = None
-        if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_KEY:
-            try:
-                self.client = create_client(
-                    settings.SUPABASE_URL,
-                    settings.SUPABASE_SERVICE_KEY
-                )
-                logger.info("Supabase client initialized successfully")
-            except Exception as e:
-                logger.error(f"Failed to initialize Supabase client: {e}")
-                self.client = None
+    _instance = None
+    _client = None
 
-    async def initialize(self):
-        """Initialize the Supabase client asynchronously."""
-        if not self.client and settings.SUPABASE_URL and settings.SUPABASE_SERVICE_KEY:
-            try:
-                self.client = create_client(
-                    settings.SUPABASE_URL,
-                    settings.SUPABASE_SERVICE_KEY
-                )
-                logger.info("Supabase client initialized successfully")
-            except Exception as e:
-                logger.error(f"Failed to initialize Supabase client: {e}")
-                self.client = None
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(SupabaseClient, cls).__new__(cls)
+        return cls._instance
+
+    def __init__(self):
+        if self._client is None:
+            self.initialize()
+
+    def initialize(self):
+        """Initialize the Supabase client."""
+        try:
+            self._client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
+            logger.info("Supabase client initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize Supabase client: {str(e)}")
+            raise
+
+    @property
+    def client(self) -> Client:
+        """Get the Supabase client instance."""
+        if self._client is None:
+            self.initialize()
+        return self._client
 
     @retry_on_failure(times=3, delay=0.5)
     async def insert_conversation(
@@ -172,7 +174,7 @@ class SupabaseClient:
             logger.error(f"Supabase health check failed: {str(e)}")
             return False
 
-# Initialize Supabase client singleton
+# Create a singleton instance
 supabase_client = SupabaseClient()
 
 # Export the singleton instance
