@@ -15,10 +15,14 @@ from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExport
 import json
 from datetime import datetime
 
+# Set up logging first
+setup_logging()
+logger = logging.getLogger(__name__)
+
 try:
     from app.config import settings
 except Exception as e:
-    logging.warning(f"Could not load settings: {e}")
+    logger.warning(f"Could not load settings: {e}")
     settings: Optional[object] = None
 
 # Setup tracing
@@ -29,10 +33,7 @@ try:
     else:
         logger.warning("OpenTelemetry tracing disabled - no OTLP endpoint configured")
 except Exception as e:
-    logging.warning(f"Tracing setup failed: {e}")
-
-# Setup logging
-setup_logging()
+    logger.warning(f"Tracing setup failed: {e}")
 
 # Configure JSON logging
 class JSONFormatter(logging.Formatter):
@@ -50,7 +51,6 @@ class JSONFormatter(logging.Formatter):
         return json.dumps(log_record)
 
 # Set up logging
-logger = logging.getLogger("app")
 handler = logging.StreamHandler()
 handler.setFormatter(JSONFormatter())
 logger.addHandler(handler)
@@ -130,7 +130,7 @@ FastAPIInstrumentor.instrument_app(
 @app.on_event("startup")
 async def startup_event():
     """Log application startup."""
-    logging.info("Application startup complete")
+    logger.info("Application startup complete")
 
 @app.middleware("http")
 async def add_request_id(request: Request, call_next):

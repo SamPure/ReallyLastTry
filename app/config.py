@@ -16,38 +16,38 @@ class Settings(BaseSettings):
     DEFAULT_AREA_CODE: str = "212"
 
     # Google Sheets
-    GOOGLE_SHEETS_CREDENTIALS: str
-    GOOGLE_SHEETS_TOKEN: str
-    GOOGLE_SHEETS_ID: str
+    GOOGLE_SHEETS_CREDENTIALS: Optional[str] = None
+    GOOGLE_SHEETS_TOKEN: Optional[str] = None
+    GOOGLE_SHEETS_ID: Optional[str] = None
     LEADS_SHEET_NAME: str = "AllLeads"
 
     # Email (Gmail)
-    GMAIL_USER: str
-    GMAIL_CLIENT_ID: str
-    GMAIL_CLIENT_SECRET: str
-    GMAIL_REFRESH_TOKEN: str
-    EMAIL_PASSWORD: Optional[str] = None  # Previously EMAIL_API_KEY
-    REPORT_EMAIL: Optional[str] = None    # Previously EMAIL_DAILY_REPORT_TO
+    GMAIL_USER: Optional[str] = None
+    GMAIL_CLIENT_ID: Optional[str] = None
+    GMAIL_CLIENT_SECRET: Optional[str] = None
+    GMAIL_REFRESH_TOKEN: Optional[str] = None
+    EMAIL_PASSWORD: Optional[str] = None
+    REPORT_EMAIL: Optional[str] = None
 
     # SMS
-    TWILIO_ACCOUNT_SID: str
-    TWILIO_AUTH_TOKEN: str
-    TWILIO_PHONE_NUMBER: str
+    TWILIO_ACCOUNT_SID: Optional[str] = None
+    TWILIO_AUTH_TOKEN: Optional[str] = None
+    TWILIO_PHONE_NUMBER: Optional[str] = None
 
     # Infrastructure
-    REDIS_URL: str
-    REDIS_PASSWORD: str
+    REDIS_URL: Optional[str] = None
+    REDIS_PASSWORD: Optional[str] = None
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
     REDIS_SSL: bool = True
     PORT: int = 8000
     PROMETHEUS_PORT: int = 8001
     CELERY_BROKER_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-    OTLP_ENDPOINT: Optional[str] = None  # Optional OTLP endpoint for tracing
+    OTLP_ENDPOINT: Optional[str] = None
 
     # Supabase
-    SUPABASE_URL: str
-    SUPABASE_SERVICE_KEY: Optional[str] = None  # Previously SUPABASE_KEY
+    SUPABASE_URL: Optional[str] = None
+    SUPABASE_SERVICE_KEY: Optional[str] = None
 
     # Batch processing
     BATCH_CHUNK_SIZE: int = 500
@@ -59,26 +59,27 @@ class Settings(BaseSettings):
 
     @validator("GOOGLE_SHEETS_ID")
     def validate_sheet_id(cls, v):
-        if not v or len(v) < 10:  # Basic validation for Google Sheet ID format
+        if v and len(v) < 10:  # Only validate if value is provided
             raise ValueError("GOOGLE_SHEETS_ID must be a valid Google Sheet ID")
         return v
 
     @validator("GMAIL_USER")
     def validate_email_sender(cls, v):
-        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        if not v or not re.match(email_pattern, v):
-            raise ValueError("GMAIL_USER must be a valid email address")
+        if v:  # Only validate if value is provided
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            if not re.match(email_pattern, v):
+                raise ValueError("GMAIL_USER must be a valid email address")
         return v
 
     @validator("TWILIO_ACCOUNT_SID")
     def validate_kixie_key(cls, v):
-        if not v or len(v) < 10:
+        if v and len(v) < 10:  # Only validate if value is provided
             raise ValueError("TWILIO_ACCOUNT_SID must be a valid API key")
         return v
 
     @validator("SUPABASE_URL")
     def validate_supabase_url(cls, v):
-        if not v or not v.startswith("https://"):
+        if v and not v.startswith("https://"):  # Only validate if value is provided
             raise ValueError("SUPABASE_URL must be a valid HTTPS URL")
         return v
 
@@ -97,10 +98,26 @@ class Settings(BaseSettings):
 
     def validate_optional_settings(self) -> None:
         """Validate optional settings and log warnings for missing values."""
+        if not self.GOOGLE_SHEETS_CREDENTIALS:
+            logger.warning("GOOGLE_SHEETS_CREDENTIALS is missing—Google Sheets features will be disabled!")
+        if not self.GOOGLE_SHEETS_TOKEN:
+            logger.warning("GOOGLE_SHEETS_TOKEN is missing—Google Sheets features will be disabled!")
+        if not self.GOOGLE_SHEETS_ID:
+            logger.warning("GOOGLE_SHEETS_ID is missing—Google Sheets features will be disabled!")
         if not self.EMAIL_PASSWORD:
             logger.warning("EMAIL_PASSWORD is missing—email features will be disabled!")
         if not self.REPORT_EMAIL:
             logger.warning("REPORT_EMAIL is missing—daily reports will be disabled!")
+        if not self.TWILIO_ACCOUNT_SID:
+            logger.warning("TWILIO_ACCOUNT_SID is missing—SMS features will be disabled!")
+        if not self.TWILIO_AUTH_TOKEN:
+            logger.warning("TWILIO_AUTH_TOKEN is missing—SMS features will be disabled!")
+        if not self.TWILIO_PHONE_NUMBER:
+            logger.warning("TWILIO_PHONE_NUMBER is missing—SMS features will be disabled!")
+        if not self.REDIS_URL:
+            logger.warning("REDIS_URL is missing—Redis features will be disabled!")
+        if not self.REDIS_PASSWORD:
+            logger.warning("REDIS_PASSWORD is missing—Redis features will be disabled!")
         if not self.SUPABASE_SERVICE_KEY:
             logger.warning("SUPABASE_SERVICE_KEY is missing—Supabase features will be disabled!")
         if not self.OTLP_ENDPOINT:
