@@ -7,6 +7,14 @@ from prometheus_client import make_asgi_app
 from typing import Optional, Dict
 import json
 from datetime import datetime
+from app.api import leads, messaging
+from app.core.config import settings
+from app.core.logging import setup_logging
+from app.services.supabase_client import supabase
+from app.jobs.sheet_sync import sheet_sync
+from fastapi.responses import JSONResponse
+from app.services.config_manager import get_settings
+from app.jobs.email_scheduler import start_email_scheduler, stop_email_scheduler
 
 # Set up logging first
 logger = logging.getLogger(__name__)
@@ -40,114 +48,83 @@ logger.setLevel(logging.INFO)
 
 # Initialize FastAPI app with metadata
 app = FastAPI(
-    title="Lead Follow-up Service",
-    description="""
-    A FastAPI service for managing lead follow-ups and automation.
-
-    ## Features
-
-    * Health monitoring
-    * Batch processing
-    * Email notifications
-    * SMS integration (Kixie)
-    * Google Sheets integration
-    * Supabase database integration
-
-    ## Authentication
-
-    All endpoints require API key authentication via the `X-API-Key` header.
-    """,
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
-    openapi_tags=[
-        {
-            "name": "health",
-            "description": "Health check endpoints for monitoring",
-        },
-        {
-            "name": "batch",
-            "description": "Batch processing operations",
-        },
-        {
-            "name": "metrics",
-            "description": "Prometheus metrics endpoint",
-        },
-    ],
+    title="Lead Management API",
+    description="API for managing leads, communications, and analytics",
+    version="1.0.0"
 )
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Include routers
+app.include_router(leads.router)
+app.include_router(messaging.router)
+
 @app.on_event("startup")
 async def startup_event():
-    """Log application startup."""
-    logger.info("Application startup complete")
+    """Initialize services on startup."""
+    try:
+        # Initialize Supabase client
+        await supabase.initialize()
+        logger.info("Supabase client initialized")
 
-@app.middleware("http")
-async def add_request_id(request: Request, call_next):
-    """Add request ID to logs."""
-    request_id = request.headers.get("X-Request-ID", "no-request-id")
+        # Initialize Google Sheets sync
+        await sheet_sync.initialize()
+        logger.info("Google Sheets sync initialized")
 
-    # Add request ID to logger
-    logger = logging.getLogger("app")
-    logger = logging.LoggerAdapter(logger, {"request_id": request_id})
+        # Start email scheduler
+        start_email_scheduler()
+        logger.info("Application startup complete")
+    except Exception as e:
+        logger.error(f"Error during startup: {str(e)}")
+        raise
 
-    response = await call_next(request)
-    return response
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown."""
+    try:
+        # Close Kixie handler
+        await kixie_handler.close()
+        logger.info("Kixie handler closed")
 
-@app.get("/health", tags=["health"])
-async def health() -> Dict[str, str]:
-    """
-    Health check endpoint for Railway.
+        # Stop email scheduler
+        stop_email_scheduler()
+        logger.info("Application shutdown complete")
+    except Exception as e:
+        logger.error(f"Error during shutdown: {str(e)}")
 
-    Returns:
-        Dict[str, str]: Status message indicating service health
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": "1.0.0"
+    }
 
-    Raises:
-        HTTPException: If the service is unhealthy
-    """
-    logger.info("Health check requested")
-    return {"status": "ok"}
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Global exception handler."""
+    logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    )
 
-@app.get("/ready", tags=["health"])
-async def ready() -> Dict[str, str]:
-    """
-    Readiness probe for the service.
-
-    Returns:
-        Dict[str, str]: Status message indicating service readiness
-
-    Raises:
-        HTTPException: If the service is not ready
-    """
-    logger.info("Readiness check requested")
-    return {"status": "ready"}
-
-@app.get("/", tags=["health"])
-async def root() -> Dict[str, str]:
-    """
-    Root endpoint that also serves as a health check.
-
-    Returns:
-        Dict[str, str]: Status message indicating service health
-    """
-    logger.info("Root endpoint accessed")
-    return {"status": "ok"}
-
-# Mount metrics endpoint
-app.mount("/metrics", make_asgi_app())
-
-@app.post("/batch")
-async def batch_operation(request: Request):
-    """Batch operation endpoint."""
-    data = await request.json()
-    logger.info("Batch operation requested", extra={"batch_size": len(data.get("operations", []))})
-    return {"status": "processing", "operations": len(data.get("operations", []))}
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=settings.DEBUG
+    )

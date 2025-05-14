@@ -1,0 +1,46 @@
+{% extends "email/base.html" %}
+
+{% block content %}
+<h2>Follow-up: {{ lead.name }}</h2>
+
+<p>Hi {{ lead.name }},</p>
+
+<p>I hope this email finds you well. I wanted to follow up on our previous conversation about {{ lead.topic }}.</p>
+
+{% if lead.last_contact %}
+<p>Since our last contact on {{ lead.last_contact|date:"%B %d, %Y" }}, I've been thinking about how we can help you with your goals.</p>
+{% endif %}
+
+{% if lead.specific_questions %}
+<h3>Questions for You</h3>
+<ul>
+    {% for question in lead.specific_questions %}
+    <li>{{ question }}</li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+{% if lead.next_steps %}
+<h3>Next Steps</h3>
+<ul>
+    {% for step in lead.next_steps %}
+    <li>{{ step }}</li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+<p>Would you be available for a quick call to discuss this further? I'm happy to work around your schedule.</p>
+
+<a href="{{ calendar_link }}" class="button">Schedule a Call</a>
+
+<p>If you have any questions in the meantime, please don't hesitate to reach out.</p>
+
+<p>Best regards,<br>
+{{ broker_name }}<br>
+{{ company_name }}</p>
+{% endblock %}
+
+{% block footer %}
+{{ super() }}
+<p>This is an automated follow-up message. To adjust your communication preferences, please <a href="{{ preferences_url }}">update your settings</a>.</p>
+{% endblock %}

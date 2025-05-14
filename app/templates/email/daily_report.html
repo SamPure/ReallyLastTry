@@ -1,0 +1,68 @@
+{% extends "email/base.html" %}
+
+{% block content %}
+<h2>Daily Email Report</h2>
+
+<p>Here's your daily email activity report for {{ date|date:"%B %d, %Y" }}:</p>
+
+<h3>Summary</h3>
+<ul>
+    <li>Total Emails Sent: {{ metrics.total_sent }}</li>
+    <li>Successful Sends: {{ metrics.successful_sends }}</li>
+    <li>Failed Sends: {{ metrics.failed_sends }}</li>
+    <li>Retry Attempts: {{ metrics.retry_attempts }}</li>
+    <li>Current Queue Size: {{ metrics.current_queue_size }}</li>
+    <li>Retry Queue Size: {{ metrics.retry_queue_size }}</li>
+</ul>
+
+{% if metrics.failed_sends > 0 %}
+<h3>Failed Sends</h3>
+<table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+    <thead>
+        <tr style="background-color: #f5f5f5;">
+            <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Recipient</th>
+            <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Error</th>
+            <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Time</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for failure in metrics.failures %}
+        <tr>
+            <td style="padding: 10px; border: 1px solid #ddd;">{{ failure.recipient }}</td>
+            <td style="padding: 10px; border: 1px solid #ddd;">{{ failure.error }}</td>
+            <td style="padding: 10px; border: 1px solid #ddd;">{{ failure.time }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+{% if metrics.retry_queue_size > 0 %}
+<h3>Pending Retries</h3>
+<p>The following emails are scheduled for retry:</p>
+<ul>
+    {% for retry in metrics.pending_retries %}
+    <li>{{ retry.recipient }} (Next attempt: {{ retry.next_attempt }})</li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+<h3>Queue Health</h3>
+<p>Status: <strong style="color: {{ 'green' if metrics.is_healthy else 'red' }}">{{ 'Healthy' if metrics.is_healthy else 'Needs Attention' }}</strong></p>
+
+{% if not metrics.is_healthy %}
+<p>Recommendations:</p>
+<ul>
+    {% for recommendation in metrics.recommendations %}
+    <li>{{ recommendation }}</li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+<p>You can view more detailed metrics and manage the email queue through the <a href="{{ dashboard_url }}">admin dashboard</a>.</p>
+{% endblock %}
+
+{% block footer %}
+{{ super() }}
+<p>This is an automated report. To adjust your report preferences, please <a href="{{ preferences_url }}">update your settings</a>.</p>
+{% endblock %}

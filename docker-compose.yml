@@ -1,30 +1,31 @@
 version: '3.8'
 
 services:
-  redis:
-    image: redis:latest
-    ports:
-      - "6379:6379"
-    command: redis-server --requirepass ${REDIS_PASSWORD}
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 3
-
-  api:
+  app:
     build: .
     ports:
       - "8000:8000"
+      - "8001:8001"
     environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - ENVIRONMENT=development
       - PORT=8000
+      - PROMETHEUS_PORT=8001
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - GMAIL_USER=${GMAIL_USER}
+      - GMAIL_CLIENT_ID=${GMAIL_CLIENT_ID}
+      - GMAIL_CLIENT_SECRET=${GMAIL_CLIENT_SECRET}
+      - GMAIL_REFRESH_TOKEN=${GMAIL_REFRESH_TOKEN}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+      - REPORT_EMAIL=${REPORT_EMAIL}
+      - KIXIE_API_KEY=${KIXIE_API_KEY}
+      - KIXIE_BASE_URL=${KIXIE_BASE_URL}
+      - GOOGLE_SHEETS_CREDENTIALS=${GOOGLE_SHEETS_CREDENTIALS}
+      - GOOGLE_SHEETS_TOKEN=${GOOGLE_SHEETS_TOKEN}
+      - GOOGLE_SHEETS_ID=${GOOGLE_SHEETS_ID}
     volumes:
       - .:/app
-    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-    depends_on:
-      redis:
-        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   worker:
     build: .
