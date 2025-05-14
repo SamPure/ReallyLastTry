@@ -8,12 +8,11 @@ from typing import Optional, Dict
 import json
 from datetime import datetime
 from app.api import leads, messaging
-from app.core.config import settings
+from app.services.config_manager import get_settings
 from app.core.logging import setup_logging
 from app.services.supabase_client import supabase_client
 from app.jobs.sheet_sync import sheet_sync
 from fastapi.responses import JSONResponse
-from app.services.config_manager import get_settings
 from app.jobs.email_scheduler import start_email_scheduler, stop_email_scheduler
 from app.services.email_service import email_service, EmailService
 from app.services.kixie_handler import KixieHandler
@@ -21,14 +20,11 @@ from app.services.google_sheets import GoogleSheetsService
 from app.jobs.scheduler_service import SchedulerService
 import time
 
+# Initialize settings
+settings = get_settings()
+
 # Set up logging first
 logger = logging.getLogger(__name__)
-
-try:
-    from app.config import settings
-except Exception as e:
-    logger.warning(f"Could not load settings: {e}")
-    settings: Optional[object] = None
 
 # Configure JSON logging
 class JSONFormatter(logging.Formatter):
