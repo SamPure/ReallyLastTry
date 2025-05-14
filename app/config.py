@@ -33,16 +33,9 @@ class Settings(BaseSettings):
     KIXIE_API_KEY: Optional[str] = None
     KIXIE_BASE_URL: Optional[str] = None
 
-    # Infrastructure (Optional)
-    REDIS_URL: Optional[str] = None
-    REDIS_PASSWORD: Optional[str] = None
-    REDIS_PORT: int = 6379
-    REDIS_DB: int = 0
-    REDIS_SSL: bool = True
+    # Core Infrastructure
     PORT: int = 8000
     PROMETHEUS_PORT: int = 8001
-    CELERY_BROKER_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-    OTLP_ENDPOINT: Optional[str] = None
 
     # Supabase
     SUPABASE_URL: Optional[str] = None
@@ -117,14 +110,6 @@ class Settings(BaseSettings):
         if not self.KIXIE_BASE_URL:
             logger.warning("KIXIE_BASE_URL is missing—SMS features will be disabled!")
 
-        # Infrastructure (Optional)
-        if not self.REDIS_URL:
-            logger.warning("REDIS_URL is missing—Redis features will be disabled!")
-        if not self.REDIS_PASSWORD:
-            logger.warning("REDIS_PASSWORD is missing—Redis features will be disabled!")
-        if not self.OTLP_ENDPOINT:
-            logger.warning("OTLP_ENDPOINT is missing—distributed tracing will be disabled!")
-
         # Supabase
         if not self.SUPABASE_SERVICE_KEY:
             logger.warning("SUPABASE_SERVICE_KEY is missing—Supabase features will be disabled!")
@@ -149,12 +134,10 @@ class Settings(BaseSettings):
         logger.info(f"Prometheus Port: {self.PROMETHEUS_PORT}")
         logger.info(f"Batch Chunk Size: {self.BATCH_CHUNK_SIZE}")
         logger.info(f"Max Retries: {self.MAX_RETRIES}")
-        logger.info(f"Redis TLS: {self.REDIS_SSL}")
         logger.info(f"Email Features: {'Enabled' if self.EMAIL_PASSWORD else 'Disabled'}")
         logger.info(f"Supabase Features: {'Enabled' if self.SUPABASE_SERVICE_KEY else 'Disabled'}")
         logger.info(f"Google Sheets Integration: {'Enabled' if self.GOOGLE_SHEETS_CREDENTIALS else 'Disabled'}")
         logger.info(f"SMS Features: {'Enabled' if self.KIXIE_API_KEY else 'Disabled'}")
-        logger.info(f"Distributed Tracing: {'Enabled' if self.OTLP_ENDPOINT else 'Disabled'}")
 
 
 # Initialize settings and validate optional values

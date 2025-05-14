@@ -5,18 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pythonjsonlogger import jsonlogger
 from prometheus_client import make_asgi_app
 from typing import Optional, Dict
-from app.core.tracing import setup_tracing
-from app.core.logging import setup_logging
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 import json
 from datetime import datetime
 
 # Set up logging first
-setup_logging()
 logger = logging.getLogger(__name__)
 
 try:
@@ -24,16 +16,6 @@ try:
 except Exception as e:
     logger.warning(f"Could not load settings: {e}")
     settings: Optional[object] = None
-
-# Setup tracing
-try:
-    if settings and settings.OTLP_ENDPOINT:
-        setup_tracing()
-        logger.info(f"OpenTelemetry tracing enabled with endpoint: {settings.OTLP_ENDPOINT}")
-    else:
-        logger.warning("OpenTelemetry tracing disabled - no OTLP endpoint configured")
-except Exception as e:
-    logger.warning(f"Tracing setup failed: {e}")
 
 # Configure JSON logging
 class JSONFormatter(logging.Formatter):
@@ -67,7 +49,7 @@ app = FastAPI(
     * Health monitoring
     * Batch processing
     * Email notifications
-    * SMS integration
+    * SMS integration (Kixie)
     * Google Sheets integration
     * Supabase database integration
 
@@ -104,29 +86,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Set up OpenTelemetry
-trace.set_tracer_provider(TracerProvider())
-tracer = trace.get_tracer(__name__)
-
-# Configure OTLP exporter if endpoint is available
-if settings and settings.OTLP_ENDPOINT:
-    try:
-        otlp_exporter = OTLPSpanExporter(
-            endpoint=settings.OTLP_ENDPOINT,
-            insecure=True
-        )
-        span_processor = BatchSpanProcessor(otlp_exporter)
-        trace.get_tracer_provider().add_span_processor(span_processor)
-        logger.info("OTLP exporter configured successfully")
-    except Exception as e:
-        logger.error(f"Failed to configure OTLP exporter: {e}")
-
-# Instrument FastAPI
-FastAPIInstrumentor.instrument_app(
-    app,
-    excluded_urls="/health,/ready,/metrics"
-)
-
 @app.on_event("startup")
 async def startup_event():
     """Log application startup."""
@@ -134,21 +93,15 @@ async def startup_event():
 
 @app.middleware("http")
 async def add_request_id(request: Request, call_next):
-    """Add request ID to logs and traces."""
+    """Add request ID to logs."""
     request_id = request.headers.get("X-Request-ID", "no-request-id")
 
     # Add request ID to logger
     logger = logging.getLogger("app")
     logger = logging.LoggerAdapter(logger, {"request_id": request_id})
 
-    # Create span for request
-    with tracer.start_as_current_span(
-        f"{request.method} {request.url.path}",
-        attributes={"http.request_id": request_id}
-    ) as span:
-        response = await call_next(request)
-        span.set_attribute("http.status_code", response.status_code)
-        return response
+    response = await call_next(request)
+    return response
 
 @app.get("/health", tags=["health"])
 async def health() -> Dict[str, str]:
