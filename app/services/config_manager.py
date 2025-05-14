@@ -62,9 +62,11 @@ class Settings(BaseSettings):
 
     @validator("GOOGLE_CREDENTIALS", pre=True)
     def parse_google_credentials(cls, v):
-        """Parse Google service account credentials from JSON string if needed."""
+        """Parse Google service account credentials from JSON string if needed, handling escaped newlines."""
         if isinstance(v, str):
             try:
+                # Replace escaped \n with real newlines for private_key
+                v = v.replace('\\n', '\n')
                 return json.loads(v)
             except json.JSONDecodeError as e:
                 raise ValueError(f"Invalid Google service account JSON: {e}")
