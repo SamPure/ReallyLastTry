@@ -22,10 +22,6 @@ import time
 # Initialize settings
 settings = get_settings()
 
-# Set up logging first
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
-
 # Configure JSON logging
 class JSONFormatter(logging.Formatter):
     def format(self, record):
@@ -41,11 +37,15 @@ class JSONFormatter(logging.Formatter):
             log_record["request_id"] = record.request_id
         return json.dumps(log_record)
 
-# Set up logging
+# Set up logging globally
 handler = logging.StreamHandler()
 handler.setFormatter(JSONFormatter())
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+root_logger = logging.getLogger()
+root_logger.addHandler(handler)
+root_logger.setLevel(logging.INFO)
+
+# Get module logger
+logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app with metadata
 app = FastAPI(
