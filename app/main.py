@@ -1,6 +1,6 @@
 import logging
 import sys
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pythonjsonlogger import jsonlogger
 from prometheus_client import make_asgi_app, generate_latest, CONTENT_TYPE_LATEST
@@ -17,6 +17,7 @@ from app.services.email_service import email_service, EmailService
 from app.services.kixie_handler import KixieHandler
 from app.services.google_sheets import GoogleSheetsService
 from app.jobs.scheduler_service import start_scheduler
+from app.services.retry_logger import retry_logger
 import time
 
 # Initialize settings
@@ -180,6 +181,21 @@ async def readiness_check():
             "timestamp": datetime.utcnow().isoformat(),
             "error": str(e)
         }
+
+@app.get("/metrics")
+async def metrics():
+    """Expose service metrics and statistics."""
+    try:
+        return {
+            "timestamp": datetime.utcnow().isoformat(),
+            "services": {
+                "email": email_service.get_stats(),
+                "retry_stats": retry_logger.get_stats()
+            }
+        }
+    except Exception as e:
+        logger.error(f"Metrics collection failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):

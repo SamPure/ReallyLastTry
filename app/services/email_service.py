@@ -1,6 +1,6 @@
 import logging
 import asyncio
-from datetime import datetime
+from datetime import datetime, time
 from typing import Dict, Any, List, Optional, Tuple
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -13,9 +13,9 @@ from apscheduler.triggers.cron import CronTrigger
 import json
 import os
 import smtplib
-
 from app.services.config_manager import get_settings
 from app.services.supabase_client import get_supabase_client
+from app.services.retry_logger import with_retry_logging, retry_logger
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -65,24 +65,26 @@ class EmailService:
         self.smtp_server = "smtp.gmail.com"
         self.smtp_port = 587
         self.sender_email = settings.EMAIL_SENDER
+        self.settings = get_settings()
+        self.gmail_service = None
 
     def _initialize_gmail_service(self):
         """Initialize Gmail API service."""
         try:
-            raw_creds = settings.GOOGLE_SHEETS_CREDENTIALS_JSON
-            if not raw_creds or raw_creds.strip() == "{}":
-                logger.warning("⚠️ Gmail credentials not configured. Skipping Gmail service initialization.")
-                return  # gracefully exit early
+            if not self.settings.GOOGLE_SHEETS_CREDENTIALS_JSON:
+                logger.warning("No Gmail credentials provided, email service will be disabled")
+                return
 
+            credentials_json = json.loads(self.settings.GOOGLE_SHEETS_CREDENTIALS_JSON)
             credentials = service_account.Credentials.from_service_account_info(
-                json.loads(raw_creds),
-                scopes=["https://www.googleapis.com/auth/gmail.send"]
+                credentials_json,
+                scopes=['https://www.googleapis.com/auth/gmail.send']
             )
-            self.gmail_service = build("gmail", "v1", credentials=credentials)
+            self.gmail_service = build('gmail', 'v1', credentials=credentials)
             logger.info("Gmail service initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize Gmail service: {str(e)}")
-            raise
+            logger.error(f"Failed to initialize Gmail service: {e}")
+            self.gmail_service = None
 
     def _setup_scheduler(self):
         """Configure the scheduler for batch email processing."""
@@ -234,6 +236,7 @@ class EmailService:
                 self.metrics.last_error_message = error_msg
                 return False, None, error_msg
 
+    @with_retry_logging(max_retries=3, job_name="send_email")
     async def send_email(
         self,
         to: str,
@@ -429,9 +432,10 @@ class EmailService:
 
     def is_within_business_hours(self) -> bool:
         """Check if current time is within business hours."""
-        now = datetime.now()
-        current_hour = now.hour
-        return settings.BUSINESS_HOURS_START <= current_hour < settings.BUSINESS_HOURS_END
+        current_time = datetime.now().time()
+        return (
+            self.settings.FOLLOWUP_START_HOUR <= current_time.hour < self.settings.FOLLOWUP_END_HOUR
+        )
 
     async def schedule_email(
         self,
@@ -450,6 +454,13 @@ class EmailService:
         except Exception as e:
             logger.error(f"Failed to schedule email: {str(e)}")
             return False
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get email service statistics including retry/failure counts."""
+        return {
+            "service_initialized": self.gmail_service is not None,
+            "retry_stats": retry_logger.get_stats()
+        }
 
 # Initialize singleton instance
 email_service = EmailService()
