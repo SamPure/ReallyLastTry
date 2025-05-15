@@ -9,7 +9,6 @@ import json
 from datetime import datetime
 from app.api import leads, messaging
 from app.services.config_manager import get_settings
-from app.core.logging import setup_logging
 from app.services.supabase_client import get_supabase_client
 from app.jobs.sheet_sync import sheet_sync
 from fastapi.responses import JSONResponse
@@ -25,6 +24,7 @@ settings = get_settings()
 
 # Set up logging first
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 # Configure JSON logging
 class JSONFormatter(logging.Formatter):
@@ -200,5 +200,5 @@ if __name__ == "__main__":
         "app.main:app",
         host="0.0.0.0",
         port=8000,
-        reload=settings.DEBUG
+        reload=True
     )
