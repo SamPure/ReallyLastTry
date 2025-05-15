@@ -16,7 +16,7 @@ from app.jobs.email_scheduler import start_email_scheduler, stop_email_scheduler
 from app.services.email_service import email_service, EmailService
 from app.services.kixie_handler import KixieHandler
 from app.services.google_sheets import GoogleSheetsService
-from app.jobs.scheduler_service import SchedulerService
+from app.jobs.scheduler_service import start_scheduler
 import time
 
 # Initialize settings
@@ -71,7 +71,6 @@ app.mount("/metrics", metrics_app)
 email_service = EmailService()
 kixie_handler = KixieHandler()
 sheets_service = GoogleSheetsService()
-scheduler_service = SchedulerService()
 
 # Include routers
 app.include_router(leads.router)
@@ -91,11 +90,13 @@ async def startup_event():
 
         # Start email scheduler
         start_email_scheduler()
-        logger.info("Application startup complete")
+        logger.info("Email scheduler started")
 
-        # Initialize scheduler
-        await scheduler_service.initialize()
-        logger.info("Scheduler initialized successfully")
+        # Start follow-up scheduler
+        start_scheduler()
+        logger.info("Follow-up scheduler started")
+
+        logger.info("Application startup complete")
     except Exception as e:
         logger.error(f"Error during startup: {str(e)}")
         raise
@@ -110,11 +111,9 @@ async def shutdown_event():
 
         # Stop email scheduler
         stop_email_scheduler()
-        logger.info("Application shutdown complete")
+        logger.info("Email scheduler stopped")
 
-        # Cleanup scheduler
-        await scheduler_service.cleanup()
-        logger.info("Scheduler cleaned up successfully")
+        logger.info("Application shutdown complete")
     except Exception as e:
         logger.error(f"Error during shutdown: {str(e)}")
 
