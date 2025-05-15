@@ -83,6 +83,9 @@ class Settings(BaseSettings):
     # Follow-up Configuration
     FOLLOWUP_START_HOUR: int = Field(default=9, description="Hour to start follow-ups (0-23)")
     FOLLOWUP_END_HOUR: int = Field(default=17, description="Hour to end follow-ups (0-23)")
+    FOLLOWUP_QUEUE_ALERT_THRESHOLD: int = Field(default=100)
+    FOLLOWUP_BATCH_SIZE: int = Field(default=50)
+    FOLLOWUP_RETRY_DELAY: int = Field(default=300)
 
     @validator("GOOGLE_CREDENTIALS", pre=True)
     def parse_google_credentials(cls, v):

@@ -190,7 +190,16 @@ async def metrics():
             "timestamp": datetime.utcnow().isoformat(),
             "services": {
                 "email": email_service.get_stats(),
+                "followup": followup_service.get_stats(),
                 "retry_stats": retry_logger.get_stats()
+            },
+            "alerts": {
+                "email_queue": email_service.get_queue_status(),
+                "followup_queue": {
+                    "size": followup_service.metrics["queued_followups"],
+                    "threshold": followup_service.alert_threshold,
+                    "last_alert": followup_service.metrics["last_alert_time"]
+                }
             }
         }
     except Exception as e:
