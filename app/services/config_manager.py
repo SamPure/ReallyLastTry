@@ -40,12 +40,13 @@ class Settings(BaseSettings):
     EMAIL_BATCH_DELAY: int = 1
     EMAIL_QUEUE_ALERT_THRESHOLD: int = 1000
 
-    # Kixie SMS
-    KIXIE_API_KEY: str
-    # KIXIE_WEBHOOK_SECRET: Optional[str] = None  # remove or keep if needed
+    # Kixie SMS Configuration
+    KIXIE_BASE_URL: str = Field(default="https://api.kixie.com/v1")
+    KIXIE_API_KEY: str = Field(default="")
+    KIXIE_SECRET: str = Field(default="")
+    KIXIE_BUSINESS_ID: str = Field(default="")
 
     # JWT
-    # JWT_SECRET: Optional[str] = None  # remove or keep if needed
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
