@@ -10,7 +10,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.executors.pool import ThreadPoolExecutor
-from app.services.google_sheets import google_sheets, get_google_sheets_service
+from app.services.google_sheets import get_google_sheets_service
 from app.services.config_manager import get_settings
 import asyncio
 import time
@@ -174,11 +174,11 @@ scheduler = AsyncIOScheduler(
 
 async def _sync_leads():
     logging.info("Starting leads sync")
-    await google_sheets.upsert_leads_to_db()
+    await get_google_sheets_service().upsert_leads()
 
 async def _sync_tones():
     logging.info("Starting tones sync")
-    await google_sheets.upsert_tones_to_db()
+    await get_google_sheets_service().upsert_tones()
 
 def start_scheduler():
     # Schedule leads sync at configured hour/minute
