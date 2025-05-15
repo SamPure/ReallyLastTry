@@ -7,14 +7,16 @@ from plotly.subplots import make_subplots
 import json
 from collections import deque
 from metrics_store import MetricsStore
+from auth import DashboardAuth
 
 # Configuration
 API_BASE_URL = "https://finaltry-4-production.up.railway.app"
 REFRESH_INTERVAL = 30  # seconds
 HISTORY_LENGTH = 100  # number of data points to keep
 
-# Initialize metrics store
+# Initialize services
 metrics_store = MetricsStore()
+auth = DashboardAuth()
 
 def fetch_metrics():
     """Fetch metrics from the API."""
@@ -186,12 +188,16 @@ def create_time_series_chart(metrics):
 
     return fig
 
+@auth.require_auth()
 def main():
     st.set_page_config(
         page_title="Email Service Dashboard",
         page_icon="📧",
         layout="wide"
     )
+
+    # Add logout button to sidebar
+    auth.logout()
 
     st.title("📧 Email Service Dashboard")
 

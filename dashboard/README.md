@@ -11,6 +11,7 @@ A real-time monitoring dashboard for the Email Service, built with Streamlit.
 - Historical metrics with time series charts
 - Metrics persistence with SQLite
 - Data export functionality
+- Secure authentication system
 - Auto-refresh every 30 seconds
 
 ## Installation
@@ -23,6 +24,12 @@ pip install -r requirements.txt
 
 2. Configure the API URL:
    Edit `app.py` and update `API_BASE_URL` to point to your API endpoint.
+
+3. Set up authentication:
+   - Default credentials are created in `.streamlit/secrets.toml`
+   - Username: `admin`
+   - Password: `admin`
+   - **IMPORTANT**: Change these credentials in production!
 
 ## Running the Dashboard
 
@@ -72,6 +79,22 @@ The dashboard will be available at `http://localhost:8501`.
 7. **Retry Statistics**
    - Bar chart showing retry attempts and failures by job
 
+## Authentication
+
+The dashboard uses a secure authentication system:
+
+- Credentials stored in `.streamlit/secrets.toml`
+- Passwords are hashed using SHA-256
+- Session-based authentication
+- Automatic logout after browser close
+- Logout button in sidebar
+
+To add new users or change credentials:
+
+1. Edit `.streamlit/secrets.toml`
+2. Add new users under `credentials.usernames`
+3. Use the `auth.py` script to hash passwords
+
 ## Data Persistence
 
 The dashboard uses SQLite to store historical metrics:
@@ -90,6 +113,7 @@ To modify the dashboard:
 3. Add new metrics parsing in `parse_prometheus_metrics()`
 4. Adjust history length in `HISTORY_LENGTH`
 5. Modify retention period in `cleanup_old_metrics()`
+6. Update authentication in `auth.py`
 
 ## Troubleshooting
 
@@ -102,3 +126,4 @@ If metrics are not showing:
 5. Clear browser cache if historical data appears stale
 6. Check SQLite database permissions
 7. Verify database file exists in dashboard directory
+8. Check authentication credentials in secrets file
