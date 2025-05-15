@@ -1,6 +1,6 @@
 from typing import Optional, List, Dict, Any
 from pydantic_settings import BaseSettings
-from pydantic import validator, EmailStr, HttpUrl
+from pydantic import validator, EmailStr, HttpUrl, Field
 import json
 import logging
 from functools import lru_cache
@@ -59,6 +59,19 @@ class Settings(BaseSettings):
     # Batch Processing
     BATCH_SIZE: int = 100
     BATCH_DELAY: int = 1
+
+    # Priority Scoring Settings
+    PRIORITY_RECENCY_WEIGHT: float = Field(0.5)
+    PRIORITY_ENGAGEMENT_WEIGHT: float = Field(0.3)
+    PRIORITY_CLASS_WEIGHT: float = Field(0.2)
+    PRIORITY_RECENCY_HALF_LIFE_DAYS: int = Field(7)
+    PRIORITY_ENGAGEMENT_WINDOW_DAYS: int = Field(14)
+    PRIORITY_CLASS_SCORES: dict = Field(default_factory=lambda: {
+        "hot": 1.0,
+        "warm": 0.7,
+        "cold": 0.3,
+        "default": 0.5
+    })
 
     @validator("GOOGLE_CREDENTIALS", pre=True)
     def parse_google_credentials(cls, v):
