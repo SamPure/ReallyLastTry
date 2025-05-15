@@ -4,6 +4,7 @@ from pydantic import validator, EmailStr, HttpUrl, Field
 import json
 import logging
 from functools import lru_cache
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +79,10 @@ class Settings(BaseSettings):
         "cold": 0.3,
         "default": 0.5
     })
+
+    # Follow-up Configuration
+    FOLLOWUP_START_HOUR: int = Field(default=9, description="Hour to start follow-ups (0-23)")
+    FOLLOWUP_END_HOUR: int = Field(default=17, description="Hour to end follow-ups (0-23)")
 
     @validator("GOOGLE_CREDENTIALS", pre=True)
     def parse_google_credentials(cls, v):
