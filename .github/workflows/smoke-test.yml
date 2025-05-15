@@ -1,0 +1,49 @@
+name: Smoke Test
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5 # Fail if smoke test takes too long
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install aiohttp python-json-logger
+
+      - name: Run smoke test
+        env:
+          BASE_URL: ${{ secrets.RAILWAY_URL }}
+          TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
+        run: |
+          chmod +x smoke_test.py
+          ./smoke_test.py
+
+      - name: Check test results
+        if: failure()
+        run: |
+          echo "Smoke test failed! Check the logs above for details."
+          exit 1
+
+      - name: Notify on failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: deployments
+          SLACK_COLOR: danger
+          SLACK_TITLE: Smoke Test Failed
+          SLACK_MESSAGE: "Smoke test failed after deployment to ${{ secrets.RAILWAY_URL }}"
+          SLACK_FOOTER: "GitHub Actions"

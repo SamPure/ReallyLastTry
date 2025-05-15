@@ -3,6 +3,7 @@ import asyncio
 import aiohttp
 import logging
 import sys
+import os
 from datetime import datetime
 from typing import Dict, Any
 
@@ -13,9 +14,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Configuration
-BASE_URL = "https://finaltry-4-production.up.railway.app"
-TEST_EMAIL = "test@example.com"  # Replace with your test email
+# Configuration from environment
+BASE_URL = os.getenv("BASE_URL", "https://finaltry-4-production.up.railway.app")
+TEST_EMAIL = os.getenv("TEST_EMAIL", "test@example.com")
 
 async def check_health() -> bool:
     """Check /health endpoint."""
@@ -59,6 +60,30 @@ async def check_readiness() -> bool:
         logger.error(f"Readiness check error: {e}")
         return False
 
+async def check_metrics() -> bool:
+    """Check /metrics endpoint."""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"{BASE_URL}/metrics") as response:
+                if response.status != 200:
+                    logger.error(f"Metrics check failed: {response.status}")
+                    return False
+
+                data = await response.json()
+                logger.info(f"Metrics check response: {data}")
+
+                # Verify required metrics are present
+                required_services = ["email", "followup", "retry_stats"]
+                for service in required_services:
+                    if service not in data.get("services", {}):
+                        logger.error(f"Missing {service} metrics")
+                        return False
+
+                return True
+    except Exception as e:
+        logger.error(f"Metrics check error: {e}")
+        return False
+
 async def send_test_email() -> bool:
     """Send a test email."""
     try:
@@ -99,11 +124,12 @@ async def verify_supabase() -> bool:
 
 async def run_smoke_test() -> bool:
     """Run all smoke tests."""
-    logger.info("Starting smoke test...")
+    logger.info(f"Starting smoke test against {BASE_URL}...")
 
     tests = [
         ("Health Check", check_health),
         ("Readiness Check", check_readiness),
+        ("Metrics Check", check_metrics),
         ("Supabase Check", verify_supabase),
         ("Test Email", send_test_email)
     ]
