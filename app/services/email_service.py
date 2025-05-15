@@ -70,8 +70,9 @@ class EmailService:
         """Initialize Gmail API service."""
         try:
             raw_creds = settings.GOOGLE_SHEETS_CREDENTIALS_JSON
-            if not raw_creds or raw_creds == "{}":
-                raise RuntimeError("Gmail credentials not configured")
+            if not raw_creds or raw_creds.strip() == "{}":
+                logger.warning("⚠️ Gmail credentials not configured. Skipping Gmail service initialization.")
+                return  # gracefully exit early
 
             credentials = service_account.Credentials.from_service_account_info(
                 json.loads(raw_creds),
@@ -202,6 +203,10 @@ class EmailService:
 
     async def _send_via_gmail(self, msg: MIMEMultipart) -> Tuple[bool, Optional[str], Optional[str]]:
         """Send email via Gmail API with rate limiting and error handling."""
+        if not self.gmail_service:
+            logger.warning("Gmail service not initialized. Email not sent.")
+            return False, None, "Gmail service not initialized"
+
         async with self._rate_limiter:
             try:
                 # Convert to raw message
