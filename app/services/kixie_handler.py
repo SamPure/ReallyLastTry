@@ -2,7 +2,7 @@ from typing import Optional, Dict, Any
 import logging
 import httpx
 from app.services.config_manager import settings
-from app.services.supabase_client import supabase
+from app.services.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +18,7 @@ class KixieHandler:
                 "Content-Type": "application/json"
             }
         )
+        self.supabase_client = get_supabase_client()
 
     async def send_sms(
         self,
@@ -43,8 +44,8 @@ class KixieHandler:
             result = response.json()
 
             # Log to Supabase if available
-            if supabase and metadata and "lead_id" in metadata:
-                supabase.insert_conversation(
+            if metadata and "lead_id" in metadata:
+                await self.supabase_client.insert_conversation(
                     lead_id=metadata["lead_id"],
                     message=message,
                     direction="outbound",
@@ -66,18 +67,17 @@ class KixieHandler:
             status = payload.get("status")
 
             # Find lead by phone number in Supabase
-            if supabase:
-                # This would need a new method in SupabaseClient to find by phone
-                lead = supabase.find_lead_by_phone(from_number)
-                if lead:
-                    supabase.insert_conversation(
-                        lead_id=lead["id"],
-                        message=message,
-                        direction="inbound",
-                        status=status,
-                        metadata={"kixie_message_id": message_id}
-                    )
-                    return True
+            # This would need a new method in SupabaseClient to find by phone
+            lead = await self.supabase_client.find_lead_by_phone(from_number)
+            if lead:
+                await self.supabase_client.insert_conversation(
+                    lead_id=lead["id"],
+                    message=message,
+                    direction="inbound",
+                    status=status,
+                    metadata={"kixie_message_id": message_id}
+                )
+                return True
 
             return False
         except Exception as e:
@@ -89,4 +89,4 @@ class KixieHandler:
         await self.client.aclose()
 
 # Initialize Kixie handler
-kixie = KixieHandler()
+kixie_handler = KixieHandler()
