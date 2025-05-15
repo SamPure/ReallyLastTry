@@ -81,8 +81,8 @@ async def startup_event():
     """Initialize services on startup."""
     try:
         # Initialize Supabase client
-        await get_supabase_client().initialize()
-        logger.info("Supabase client initialized")
+        get_supabase_client().initialize()
+        logger.info("Supabase client initialized successfully")
 
         # Initialize Google Sheets sync
         await sheet_sync.initialize()
@@ -98,7 +98,7 @@ async def startup_event():
 
         logger.info("Application startup complete")
     except Exception as e:
-        logger.error(f"Error during startup: {str(e)}")
+        logger.error(f"Startup failed: {e}")
         raise
 
 @app.on_event("shutdown")
