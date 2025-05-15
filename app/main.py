@@ -84,10 +84,6 @@ async def startup_event():
         get_supabase_client().initialize()
         logger.info("Supabase client initialized successfully")
 
-        # Initialize Google Sheets sync
-        await sheet_sync.initialize()
-        logger.info("Google Sheets sync initialized")
-
         # Start email scheduler
         start_email_scheduler()
         logger.info("Email scheduler started")
