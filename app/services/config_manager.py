@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     # Google Sheets
     SHEET_ID: Optional[str] = None
     GOOGLE_CREDENTIALS: Optional[str] = None
+    GOOGLE_SHEETS_CREDENTIALS_JSON: str = Field(default="")
+    LEADS_SHEET_NAME: str = Field(default="Leads")
+    TONE_SETTINGS_SHEET_NAME: str = Field(default="BrokerTones")
+    GOOGLE_SHEETS_LEADS_RANGE: str = Field(default="A1:Z1000")
+    GOOGLE_SHEETS_TONE_RANGE: str = Field(default="A1:Z100")
 
     # Email Configuration
     EMAIL_SENDER: Optional[str] = None
