@@ -25,3 +25,4 @@ opentelemetry-sdk==1.23.0
 opentelemetry-instrumentation-fastapi==0.44b0
 opentelemetry-exporter-otlp==1.23.0
 python-json-logger==2.0.7
+PyJWT==2.8.0
