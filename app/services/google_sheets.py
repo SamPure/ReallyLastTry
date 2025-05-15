@@ -2,7 +2,7 @@ import json
 import logging
 import time
 from functools import lru_cache
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
@@ -16,20 +16,40 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 class GoogleSheetsService:
     def __init__(self):
-        creds_info = json.loads(settings.GOOGLE_SHEETS_CREDENTIALS_JSON)
-        creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
-        self.client = build("sheets", "v4", credentials=creds)
-        self.sheet_id = settings.SHEET_ID
-        # Ranges pulled from settings—no hard-coded strings here
-        self.ranges = {
-            "leads": f"{settings.LEADS_SHEET_NAME}!{settings.GOOGLE_SHEETS_LEADS_RANGE}",
-            "tones": f"{settings.TONE_SETTINGS_SHEET_NAME}!{settings.GOOGLE_SHEETS_TONE_RANGE}",
-        }
+        self.client = None
+        self.sheet_id = None
+        self.ranges = None
+
+        # Check for empty credentials
+        raw_json = settings.GOOGLE_SHEETS_CREDENTIALS_JSON.strip()
+        if not raw_json:
+            logger.warning("⚠️ Google Sheets credentials not configured. Skipping Sheets service.")
+            return
+
+        try:
+            creds_info = json.loads(raw_json)
+            creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
+            self.client = build("sheets", "v4", credentials=creds)
+            self.sheet_id = settings.SHEET_ID
+            # Ranges pulled from settings—no hard-coded strings here
+            self.ranges = {
+                "leads": f"{settings.LEADS_SHEET_NAME}!{settings.GOOGLE_SHEETS_LEADS_RANGE}",
+                "tones": f"{settings.TONE_SETTINGS_SHEET_NAME}!{settings.GOOGLE_SHEETS_TONE_RANGE}",
+            }
+            logger.info("Google Sheets service initialized successfully")
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid Google Sheets credentials JSON: {e}")
+        except Exception as e:
+            logger.error(f"Failed to initialize Google Sheets service: {e}")
 
     def _normalize_headers(self, headers: List[str]) -> List[str]:
         return [h.strip().lower().replace(" ", "_") for h in headers]
 
     def _fetch_rows(self, name: str) -> List[List[Any]]:
+        if not self.client:
+            logger.warning("Google Sheets client not initialized. Skipping fetch.")
+            return []
+
         try:
             resp = (
                 self.client.spreadsheets()
@@ -43,6 +63,10 @@ class GoogleSheetsService:
             return []
 
     async def fetch_leads(self) -> List[Dict[str, Any]]:
+        if not self.client:
+            logger.warning("Google Sheets client not initialized. Skipping leads fetch.")
+            return []
+
         rows = self._fetch_rows("leads")
         if not rows or len(rows) < 2:
             return []
@@ -62,6 +86,10 @@ class GoogleSheetsService:
         return leads
 
     async def fetch_tones(self) -> Dict[str, Dict[str, Any]]:
+        if not self.client:
+            logger.warning("Google Sheets client not initialized. Skipping tones fetch.")
+            return {}
+
         rows = self._fetch_rows("tones")
         if not rows or len(rows) < 2:
             return {}
@@ -81,6 +109,10 @@ class GoogleSheetsService:
         return tones
 
     async def upsert_leads(self) -> None:
+        if not self.client:
+            logger.warning("Google Sheets client not initialized. Skipping leads upsert.")
+            return
+
         leads = await self.fetch_leads()
         start = time.time()
         success, failed = 0, 0
@@ -95,6 +127,10 @@ class GoogleSheetsService:
                      success, failed, time.time() - start)
 
     async def upsert_tones(self) -> None:
+        if not self.client:
+            logger.warning("Google Sheets client not initialized. Skipping tones upsert.")
+            return
+
         tones = await self.fetch_tones()
         start = time.time()
         success, failed = 0, 0
@@ -111,6 +147,18 @@ class GoogleSheetsService:
                 failed += 1
         logging.info("Tones upsert complete. Success: %d, Failed: %d, Time: %.2fs",
                      success, failed, time.time() - start)
+
+    def is_healthy(self) -> bool:
+        """Check if the Google Sheets service is healthy."""
+        if not self.client:
+            return True  # Consider it healthy if not configured
+        try:
+            # Try a simple API call to verify credentials
+            self.client.spreadsheets().get(spreadsheetId=self.sheet_id).execute()
+            return True
+        except Exception as e:
+            logger.error(f"Google Sheets health check failed: {e}")
+            return False
 
 @lru_cache()
 def get_google_sheets_service() -> GoogleSheetsService:
