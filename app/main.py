@@ -125,14 +125,17 @@ async def health_check():
         # Check Supabase connection
         supabase_status = "healthy" if await get_supabase_client().is_connected() else "unhealthy"
 
-        # Check email service
-        email_status = "healthy" if email_service.is_healthy() else "unhealthy"
+        # Check email service - consider it healthy if not configured
+        email_status = "healthy" if not hasattr(email_service, 'gmail_service') or email_service.is_healthy() else "unhealthy"
 
-        # Check Google Sheets sync
-        sheets_status = "healthy" if sheet_sync.is_healthy() else "unhealthy"
+        # Check Google Sheets sync - consider it healthy if not configured
+        sheets_status = "healthy" if not hasattr(sheet_sync, 'sheets_service') or sheet_sync.is_healthy() else "unhealthy"
+
+        # Overall status is healthy if Supabase is healthy and other services are either healthy or not configured
+        is_healthy = supabase_status == "healthy" and all(s in ["healthy", "not_configured"] for s in [email_status, sheets_status])
 
         return {
-            "status": "healthy" if all(s == "healthy" for s in [supabase_status, email_status, sheets_status]) else "degraded",
+            "status": "healthy" if is_healthy else "degraded",
             "timestamp": datetime.utcnow().isoformat(),
             "version": "1.0.0",
             "components": {
@@ -154,16 +157,26 @@ async def health_check():
 async def readiness_check():
     """Readiness check endpoint for Kubernetes/container orchestration."""
     try:
-        # Check if all critical services are ready
-        is_ready = all([
-            await get_supabase_client().is_connected(),
-            email_service.is_healthy(),
-            sheet_sync.is_healthy()
-        ])
+        # Check if Supabase is connected (required)
+        supabase_ready = await get_supabase_client().is_connected()
+
+        # Email service is ready if not configured or healthy
+        email_ready = not hasattr(email_service, 'gmail_service') or email_service.is_healthy()
+
+        # Sheets sync is ready if not configured or healthy
+        sheets_ready = not hasattr(sheet_sync, 'sheets_service') or sheet_sync.is_healthy()
+
+        # App is ready if Supabase is connected and other services are either ready or not configured
+        is_ready = supabase_ready and all([email_ready, sheets_ready])
 
         return {
             "status": "ready" if is_ready else "not_ready",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
+            "components": {
+                "supabase": "ready" if supabase_ready else "not_ready",
+                "email_service": "ready" if email_ready else "not_ready",
+                "sheets_sync": "ready" if sheets_ready else "not_ready"
+            }
         }
     except Exception as e:
         logger.error(f"Readiness check failed: {str(e)}")
