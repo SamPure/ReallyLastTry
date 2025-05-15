@@ -11,6 +11,7 @@ from googleapiclient.errors import HttpError
 from app.services.config_manager import get_settings, Settings
 from app.services.supabase_client import get_supabase_client
 
+logger = logging.getLogger(__name__)
 settings: Settings = get_settings()
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
