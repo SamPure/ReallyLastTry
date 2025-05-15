@@ -6,29 +6,27 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import json
 from collections import deque
+from metrics_store import MetricsStore
 
 # Configuration
 API_BASE_URL = "https://finaltry-4-production.up.railway.app"
 REFRESH_INTERVAL = 30  # seconds
 HISTORY_LENGTH = 100  # number of data points to keep
 
-# Initialize session state for historical data
-if 'historical_data' not in st.session_state:
-    st.session_state.historical_data = {
-        'timestamps': deque(maxlen=HISTORY_LENGTH),
-        'email_queue': deque(maxlen=HISTORY_LENGTH),
-        'retry_queue': deque(maxlen=HISTORY_LENGTH),
-        'followup_queue': deque(maxlen=HISTORY_LENGTH),
-        'emails_sent': deque(maxlen=HISTORY_LENGTH),
-        'emails_failed': deque(maxlen=HISTORY_LENGTH)
-    }
+# Initialize metrics store
+metrics_store = MetricsStore()
 
 def fetch_metrics():
     """Fetch metrics from the API."""
     try:
         response = requests.get(f"{API_BASE_URL}/metrics")
         if response.status_code == 200:
-            return parse_prometheus_metrics(response.text)
+            metrics = parse_prometheus_metrics(response.text)
+            # Store metrics in database
+            metrics_store.store_metrics(metrics)
+            # Cleanup old metrics (older than 7 days)
+            metrics_store.cleanup_old_metrics(days=7)
+            return metrics
         return None
     except Exception as e:
         st.error(f"Failed to fetch metrics: {str(e)}")
@@ -104,14 +102,12 @@ def create_retry_chart(metrics):
 
 def create_time_series_chart(metrics):
     """Create time series charts for historical metrics."""
-    # Update historical data
-    timestamp = datetime.now()
-    st.session_state.historical_data['timestamps'].append(timestamp)
-    st.session_state.historical_data['email_queue'].append(metrics.get('email_queue_size', 0))
-    st.session_state.historical_data['retry_queue'].append(metrics.get('email_retry_queue_size', 0))
-    st.session_state.historical_data['followup_queue'].append(metrics.get('followup_queue_size', 0))
-    st.session_state.historical_data['emails_sent'].append(metrics.get('emails_sent_total{template="default"}', 0))
-    st.session_state.historical_data['emails_failed'].append(metrics.get('emails_failed_total{error_type="default"}', 0))
+    # Get historical data from database
+    historical_data = metrics_store.get_recent_metrics(limit=HISTORY_LENGTH)
+
+    # Convert to DataFrame for easier manipulation
+    df = pd.DataFrame(historical_data)
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
 
     # Create subplots
     fig = make_subplots(
@@ -123,8 +119,8 @@ def create_time_series_chart(metrics):
     # Queue sizes
     fig.add_trace(
         go.Scatter(
-            x=list(st.session_state.historical_data['timestamps']),
-            y=list(st.session_state.historical_data['email_queue']),
+            x=df['timestamp'],
+            y=df['email_queue'],
             name='Email Queue',
             line=dict(color='blue')
         ),
@@ -132,8 +128,8 @@ def create_time_series_chart(metrics):
     )
     fig.add_trace(
         go.Scatter(
-            x=list(st.session_state.historical_data['timestamps']),
-            y=list(st.session_state.historical_data['retry_queue']),
+            x=df['timestamp'],
+            y=df['retry_queue'],
             name='Retry Queue',
             line=dict(color='orange')
         ),
@@ -141,8 +137,8 @@ def create_time_series_chart(metrics):
     )
     fig.add_trace(
         go.Scatter(
-            x=list(st.session_state.historical_data['timestamps']),
-            y=list(st.session_state.historical_data['followup_queue']),
+            x=df['timestamp'],
+            y=df['followup_queue'],
             name='Follow-up Queue',
             line=dict(color='green')
         ),
@@ -152,8 +148,8 @@ def create_time_series_chart(metrics):
     # Email statistics
     fig.add_trace(
         go.Scatter(
-            x=list(st.session_state.historical_data['timestamps']),
-            y=list(st.session_state.historical_data['emails_sent']),
+            x=df['timestamp'],
+            y=df['emails_sent'],
             name='Emails Sent',
             line=dict(color='green')
         ),
@@ -161,8 +157,8 @@ def create_time_series_chart(metrics):
     )
     fig.add_trace(
         go.Scatter(
-            x=list(st.session_state.historical_data['timestamps']),
-            y=list(st.session_state.historical_data['emails_failed']),
+            x=df['timestamp'],
+            y=df['emails_failed'],
             name='Emails Failed',
             line=dict(color='red')
         ),
@@ -285,6 +281,42 @@ def main():
     # Historical Metrics
     st.subheader("Historical Metrics")
     st.plotly_chart(create_time_series_chart(metrics), use_container_width=True)
+
+    # Metrics Summary
+    st.subheader("Metrics Summary")
+    summary = metrics_store.get_metrics_summary()
+    summary_col1, summary_col2 = st.columns(2)
+
+    with summary_col1:
+        st.metric("Total Records", summary['total_records'])
+        st.metric("First Record", summary['first_record'])
+        st.metric("Last Record", summary['last_record'])
+
+    with summary_col2:
+        st.metric("Avg Email Queue", f"{summary['avg_email_queue']:.1f}")
+        st.metric("Avg Retry Queue", f"{summary['avg_retry_queue']:.1f}")
+        st.metric("Avg Follow-up Queue", f"{summary['avg_followup_queue']:.1f}")
+
+    # Export Options
+    st.subheader("Export Metrics")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        start_date = st.date_input("Start Date", datetime.now() - timedelta(days=7))
+    with col2:
+        end_date = st.date_input("End Date", datetime.now())
+
+    if st.button("Export Metrics"):
+        metrics_json = metrics_store.export_metrics(
+            start_date=start_date.isoformat(),
+            end_date=end_date.isoformat()
+        )
+        st.download_button(
+            label="Download JSON",
+            data=metrics_json,
+            file_name=f"metrics_{start_date}_{end_date}.json",
+            mime="application/json"
+        )
 
     # Retry Statistics
     st.subheader("Retry Statistics")
