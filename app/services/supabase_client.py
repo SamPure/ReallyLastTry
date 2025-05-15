@@ -6,7 +6,7 @@ from app.services.config_manager import get_settings
 from pydantic import BaseModel
 from functools import wraps
 import time
-from httpx import Client as HTTPXClient
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -64,15 +64,12 @@ class SupabaseClient:
     def initialize(self):
         """Initialize the Supabase client."""
         try:
-            # Create a custom HTTPX client without proxy settings
-            http_client = HTTPXClient()
+            # Remove proxy-related environment variables before initializing Supabase client
+            for proxy_key in ("HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy"):
+                os.environ.pop(proxy_key, None)
 
-            # Initialize Supabase client with custom HTTP client
-            self._client = create_client(
-                settings.SUPABASE_URL,
-                settings.SUPABASE_SERVICE_KEY,
-                http_client=http_client
-            )
+            # Initialize Supabase client
+            self._client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
             logger.info("Supabase client initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Supabase client: {str(e)}")
