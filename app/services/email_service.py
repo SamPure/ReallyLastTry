@@ -434,7 +434,7 @@ class EmailService:
         """Check if current time is within business hours."""
         current_time = datetime.now().time()
         return (
-            self.settings.FOLLOWUP_START_HOUR <= current_time.hour < self.settings.FOLLOWUP_END_HOUR
+            settings.EMAIL_START_HOUR <= current_time.hour <= settings.EMAIL_END_HOUR
         )
 
     async def schedule_email(

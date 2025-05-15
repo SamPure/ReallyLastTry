@@ -5,9 +5,13 @@ from app.services.config_manager import get_settings
 from app.services.supabase_client import get_supabase_client
 from app.services.email_service import email_service
 from app.services.retry_logger import with_retry_logging, retry_logger
+import asyncio
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+scheduler = AsyncIOScheduler()
 
 class FollowupService:
     def __init__(self):
@@ -122,6 +126,33 @@ class FollowupService:
         except Exception as e:
             logger.error(f"Follow-up service health check failed: {e}")
             return False
+
+@with_retry_logging(max_retries=3, job_name="monitor_queue_size")
+async def _monitor_queue_size():
+    """Monitor email queue size and process if needed."""
+    try:
+        email_service.check_alert_threshold()
+        await email_service._process_email_queue()
+    except Exception as e:
+        logger.error(f"Error monitoring queue size: {str(e)}")
+        raise
+
+def start_scheduler():
+    """Start the email scheduler."""
+    try:
+        # Add queue monitoring job
+        scheduler.add_job(
+            lambda: asyncio.create_task(_monitor_queue_size()),
+            'interval',
+            minutes=5,
+            id='monitor_queue'
+        )
+
+        scheduler.start()
+        logger.info("Email scheduler started")
+    except Exception as e:
+        logger.error(f"Failed to start email scheduler: {str(e)}")
+        raise
 
 # Initialize singleton instance
 followup_service = FollowupService()
