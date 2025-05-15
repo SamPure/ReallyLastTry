@@ -12,7 +12,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from app.services.config_manager import get_settings
-from app.services.supabase_client import supabase_client
+from app.services.supabase_client import get_supabase_client
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -302,8 +302,8 @@ class EmailService:
             self.metrics.last_success_time = datetime.now()
 
             # Log to Supabase if available
-            if supabase_client and template_data and "lead_id" in template_data:
-                supabase_client.insert_conversation(
+            if get_supabase_client() and template_data and "lead_id" in template_data:
+                get_supabase_client().insert_conversation(
                     lead_id=template_data["lead_id"],
                     message=f"Email sent: {subject}",
                     direction="outbound",

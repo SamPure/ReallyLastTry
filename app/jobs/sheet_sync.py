@@ -5,7 +5,7 @@ from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
 from app.services.config_manager import settings
-from app.services.supabase_client import supabase_client
+from app.services.supabase_client import get_supabase_client
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.jobstores.memory import MemoryJobStore
@@ -108,8 +108,8 @@ class SheetSync:
             self.worksheet.update_cell(row, 6, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))  # Last Contact
 
             # Also update in Supabase if available
-            if supabase_client:
-                supabase_client.update_lead_status(lead_id, status, {"notes": notes})
+            if get_supabase_client():
+                get_supabase_client().update_lead_status(lead_id, status, {"notes": notes})
 
             return True
         except Exception as e:

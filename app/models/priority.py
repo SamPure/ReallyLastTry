@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import logging
 from functools import lru_cache
 from app.services.config_manager import get_settings, Settings
-from app.services.supabase_client import supabase_client
+from app.services.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class PriorityScorer:
     def _engagement_score(self, lead_id: str) -> float:
         # ratio of inbound to total messages in window
         window = datetime.utcnow() - timedelta(days=settings.PRIORITY_ENGAGEMENT_WINDOW_DAYS)
-        convs = supabase_client.fetch_recent_conversations(lead_id, limit=1000)
+        convs = get_supabase_client().fetch_recent_conversations(lead_id, limit=1000)
         inbound = sum(1 for m in convs if m["role"] == "inbound" and m["timestamp"] >= window.isoformat())
         total   = sum(1 for m in convs if m["timestamp"] >= window.isoformat())
         return (inbound / total) if total else 0.0
@@ -42,7 +42,7 @@ class PriorityScorer:
 
     def compute(self, lead: Dict[str, Any]) -> float:
         # Fetch last contact timestamp
-        recent = supabase_client.fetch_recent_conversations(lead["id"], limit=1)
+        recent = get_supabase_client().fetch_recent_conversations(lead["id"], limit=1)
         if recent:
             last_ts = datetime.fromisoformat(recent[0]["timestamp"])
         else:
@@ -133,11 +133,11 @@ class PriorityScorer:
     def _get_interaction_score(self, lead: Dict[str, Any]) -> float:
         """Calculate score based on interaction frequency."""
         try:
-            if not supabase_client:
+            if not get_supabase_client():
                 return 0.5
 
             # Get conversation count from Supabase
-            conversations = supabase_client.fetch_recent_conversations(
+            conversations = get_supabase_client().fetch_recent_conversations(
                 lead_id=lead["id"],
                 limit=100  # Get last 100 conversations
             )

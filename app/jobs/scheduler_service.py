@@ -4,7 +4,7 @@ from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.services.config_manager import get_settings
-from app.services.supabase_client import supabase_client
+from app.services.supabase_client import get_supabase_client
 from app.models.priority import priority_scorer
 from app.api.dependencies import get_current_broker  # for rate limits per broker
 
@@ -14,11 +14,11 @@ scheduler = AsyncIOScheduler()
 async def run_followups():
     logging.info("Computing lead priorities and enqueuing follow-ups")
     # fetch all active leads
-    leads = supabase_client.fetch_leads()  # synchronous call; wrap if needed
+    leads = get_supabase_client().fetch_leads()  # synchronous call; wrap if needed
     tasks = []
     for lead in leads:
         # respect 24h throttle
-        last = supabase_client.fetch_recent_conversations(lead["id"], limit=1)
+        last = get_supabase_client().fetch_recent_conversations(lead["id"], limit=1)
         if last:
             last_ts = datetime.fromisoformat(last[0]["timestamp"])
             if (datetime.utcnow() - last_ts).total_seconds() < settings.FOLLOWUP_THROTTLE_SECONDS:

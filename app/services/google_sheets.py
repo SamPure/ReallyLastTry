@@ -9,7 +9,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from app.services.config_manager import get_settings, Settings
-from app.services.supabase_client import supabase_client
+from app.services.supabase_client import get_supabase_client
 
 settings: Settings = get_settings()
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
@@ -86,7 +86,7 @@ class GoogleSheetsService:
         success, failed = 0, 0
         for lead in leads:
             try:
-                supabase_client.upsert_lead(lead)
+                get_supabase_client().upsert_lead(lead)
                 success += 1
             except Exception as e:
                 logging.error("Upsert lead %s failed: %s", lead.get("id"), e)
@@ -100,7 +100,7 @@ class GoogleSheetsService:
         success, failed = 0, 0
         for broker_id, tone in tones.items():
             try:
-                supabase_client.client.table("brokers").upsert({
+                get_supabase_client().client.table("brokers").upsert({
                     "id": broker_id,
                     "tone_style": tone["tone_style"],
                     "examples": tone["examples"],

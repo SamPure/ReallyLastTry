@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
 
 from app.services.config_manager import get_settings
-from app.services.supabase_client import supabase_client
+from app.services.supabase_client import get_supabase_client
 from app.services.kixie_handler import send_sms
 from app.services.email_service import send_email
 from app.models.priority import priority_scorer
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 async def _fetch_context(lead_id: str, limit: int = 10) -> List[Dict[str, Any]]:
     """Fetch and format conversation history for the AI model."""
     try:
-        rows = await supabase_client.fetch_recent_conversations(lead_id, limit=limit)
+        rows = await get_supabase_client().fetch_recent_conversations(lead_id, limit=limit)
         # Format for ChatCompletion, preserving order
         return [
             {"role": row["role"], "content": row["message"]}
@@ -103,7 +103,7 @@ async def generate_and_send_message(lead_id: str, score: float) -> None:
     """Generate and send an AI-powered message to a lead."""
     try:
         # 1. Load lead and broker info
-        lead = await supabase_client.fetch_lead(lead_id)
+        lead = await get_supabase_client().fetch_lead(lead_id)
         if not lead:
             logger.error(f"Lead {lead_id} not found")
             return
@@ -111,7 +111,7 @@ async def generate_and_send_message(lead_id: str, score: float) -> None:
         broker = None
         if lead.get("assigned_broker_id"):
             try:
-                broker = supabase_client.client.table("brokers")\
+                broker = get_supabase_client().client.table("brokers")\
                     .select("*")\
                     .eq("id", lead["assigned_broker_id"])\
                     .single()\
@@ -140,7 +140,7 @@ async def generate_and_send_message(lead_id: str, score: float) -> None:
 
         # 5. Log the message
         try:
-            await supabase_client.insert_conversation(
+            await get_supabase_client().insert_conversation(
                 lead_id=lead_id,
                 role="outbound",
                 message=ai_text,
