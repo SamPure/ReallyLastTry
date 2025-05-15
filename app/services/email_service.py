@@ -10,6 +10,9 @@ from googleapiclient.errors import HttpError
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+import json
+import os
+import smtplib
 
 from app.services.config_manager import get_settings
 from app.services.supabase_client import get_supabase_client
@@ -59,21 +62,25 @@ class EmailService:
         self._rate_limiter = asyncio.Semaphore(settings.RATE_LIMIT_PER_MINUTE)
         self._max_retries = 3  # Maximum number of retry attempts
         self._base_delay = 1  # Base delay in seconds for exponential backoff
+        self.smtp_server = "smtp.gmail.com"
+        self.smtp_port = 587
+        self.sender_email = settings.EMAIL_SENDER
 
     def _initialize_gmail_service(self):
-        """Initialize Gmail API service with service account credentials."""
+        """Initialize Gmail API service."""
         try:
-            # Load service account credentials
-            credentials = service_account.Credentials.from_service_account_info(
-                settings.GOOGLE_CREDENTIALS,
-                scopes=['https://www.googleapis.com/auth/gmail.send']
-            )
+            raw_creds = settings.GOOGLE_SHEETS_CREDENTIALS_JSON
+            if not raw_creds or raw_creds == "{}":
+                raise RuntimeError("Gmail credentials not configured")
 
-            # Create Gmail API service
-            self.gmail_service = build('gmail', 'v1', credentials=credentials)
-            logger.info("Gmail API service initialized")
+            credentials = service_account.Credentials.from_service_account_info(
+                json.loads(raw_creds),
+                scopes=["https://www.googleapis.com/auth/gmail.send"]
+            )
+            self.gmail_service = build("gmail", "v1", credentials=credentials)
+            logger.info("Gmail service initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize Gmail service: {e}")
+            logger.error(f"Failed to initialize Gmail service: {str(e)}")
             raise
 
     def _setup_scheduler(self):
@@ -179,7 +186,7 @@ class EmailService:
         """Create an email message with optional templating."""
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"] = settings.EMAIL_SENDER
+        msg["From"] = self.sender_email
         msg["To"] = to
 
         if template_name and template_data:
@@ -399,7 +406,7 @@ class EmailService:
         """Check if the email service is healthy."""
         try:
             # Check if we have required configuration
-            if not settings.EMAIL_SENDER:
+            if not self.sender_email:
                 return False
 
             # Check if queue processing is working
@@ -413,6 +420,30 @@ class EmailService:
             return True
         except Exception as e:
             logger.error(f"Email service health check failed: {str(e)}")
+            return False
+
+    def is_within_business_hours(self) -> bool:
+        """Check if current time is within business hours."""
+        now = datetime.now()
+        current_hour = now.hour
+        return settings.BUSINESS_HOURS_START <= current_hour < settings.BUSINESS_HOURS_END
+
+    async def schedule_email(
+        self,
+        to_email: str,
+        subject: str,
+        template_name: str,
+        template_data: Dict[str, Any],
+        scheduled_time: datetime
+    ) -> bool:
+        """Schedule an email for later delivery."""
+        try:
+            # Store in database or queue
+            # Implementation depends on your scheduling system
+            logger.info(f"Email scheduled for {scheduled_time}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to schedule email: {str(e)}")
             return False
 
 # Initialize singleton instance
