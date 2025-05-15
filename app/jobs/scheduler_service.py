@@ -6,7 +6,6 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.services.config_manager import get_settings
 from app.services.supabase_client import get_supabase_client
 from app.models.priority import priority_scorer
-from app.api.dependencies import get_current_broker  # for rate limits per broker
 
 settings = get_settings()
 scheduler = AsyncIOScheduler()
