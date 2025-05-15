@@ -8,6 +8,7 @@ A real-time monitoring dashboard for the Email Service, built with Streamlit.
 - Service health status indicators
 - Email statistics (sent/failed)
 - Retry statistics visualization
+- Historical metrics with time series charts
 - Auto-refresh every 30 seconds
 
 ## Installation
@@ -47,7 +48,13 @@ The dashboard will be available at `http://localhost:8501`.
    - Total Emails Sent
    - Total Emails Failed
 
-4. **Retry Statistics**
+4. **Historical Metrics**
+
+   - Queue sizes over time
+   - Email success/failure trends
+   - Last 100 data points (configurable)
+
+5. **Retry Statistics**
    - Bar chart showing retry attempts and failures by job
 
 ## Development
@@ -57,6 +64,7 @@ To modify the dashboard:
 1. Edit `app.py` to add new visualizations
 2. Update the refresh interval in `REFRESH_INTERVAL`
 3. Add new metrics parsing in `parse_prometheus_metrics()`
+4. Adjust history length in `HISTORY_LENGTH`
 
 ## Troubleshooting
 
@@ -66,3 +74,4 @@ If metrics are not showing:
 2. Verify Prometheus metrics format
 3. Check browser console for errors
 4. Ensure all required dependencies are installed
+5. Clear browser cache if historical data appears stale

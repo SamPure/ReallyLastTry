@@ -5,10 +5,23 @@ from datetime import datetime, timedelta
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import json
+from collections import deque
 
 # Configuration
 API_BASE_URL = "https://finaltry-4-production.up.railway.app"
 REFRESH_INTERVAL = 30  # seconds
+HISTORY_LENGTH = 100  # number of data points to keep
+
+# Initialize session state for historical data
+if 'historical_data' not in st.session_state:
+    st.session_state.historical_data = {
+        'timestamps': deque(maxlen=HISTORY_LENGTH),
+        'email_queue': deque(maxlen=HISTORY_LENGTH),
+        'retry_queue': deque(maxlen=HISTORY_LENGTH),
+        'followup_queue': deque(maxlen=HISTORY_LENGTH),
+        'emails_sent': deque(maxlen=HISTORY_LENGTH),
+        'emails_failed': deque(maxlen=HISTORY_LENGTH)
+    }
 
 def fetch_metrics():
     """Fetch metrics from the API."""
@@ -87,6 +100,94 @@ def create_retry_chart(metrics):
         barmode='group',
         height=400
     )
+    return fig
+
+def create_time_series_chart(metrics):
+    """Create time series charts for historical metrics."""
+    # Update historical data
+    timestamp = datetime.now()
+    st.session_state.historical_data['timestamps'].append(timestamp)
+    st.session_state.historical_data['email_queue'].append(metrics.get('email_queue_size', 0))
+    st.session_state.historical_data['retry_queue'].append(metrics.get('email_retry_queue_size', 0))
+    st.session_state.historical_data['followup_queue'].append(metrics.get('followup_queue_size', 0))
+    st.session_state.historical_data['emails_sent'].append(metrics.get('emails_sent_total{template="default"}', 0))
+    st.session_state.historical_data['emails_failed'].append(metrics.get('emails_failed_total{error_type="default"}', 0))
+
+    # Create subplots
+    fig = make_subplots(
+        rows=2, cols=2,
+        subplot_titles=('Queue Sizes Over Time', 'Email Statistics Over Time'),
+        vertical_spacing=0.12
+    )
+
+    # Queue sizes
+    fig.add_trace(
+        go.Scatter(
+            x=list(st.session_state.historical_data['timestamps']),
+            y=list(st.session_state.historical_data['email_queue']),
+            name='Email Queue',
+            line=dict(color='blue')
+        ),
+        row=1, col=1
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=list(st.session_state.historical_data['timestamps']),
+            y=list(st.session_state.historical_data['retry_queue']),
+            name='Retry Queue',
+            line=dict(color='orange')
+        ),
+        row=1, col=1
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=list(st.session_state.historical_data['timestamps']),
+            y=list(st.session_state.historical_data['followup_queue']),
+            name='Follow-up Queue',
+            line=dict(color='green')
+        ),
+        row=1, col=1
+    )
+
+    # Email statistics
+    fig.add_trace(
+        go.Scatter(
+            x=list(st.session_state.historical_data['timestamps']),
+            y=list(st.session_state.historical_data['emails_sent']),
+            name='Emails Sent',
+            line=dict(color='green')
+        ),
+        row=1, col=2
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=list(st.session_state.historical_data['timestamps']),
+            y=list(st.session_state.historical_data['emails_failed']),
+            name='Emails Failed',
+            line=dict(color='red')
+        ),
+        row=1, col=2
+    )
+
+    # Update layout
+    fig.update_layout(
+        height=600,
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
+    )
+
+    # Update axes labels
+    fig.update_xaxes(title_text="Time", row=1, col=1)
+    fig.update_xaxes(title_text="Time", row=1, col=2)
+    fig.update_yaxes(title_text="Queue Size", row=1, col=1)
+    fig.update_yaxes(title_text="Count", row=1, col=2)
+
     return fig
 
 def main():
@@ -180,6 +281,10 @@ def main():
             "Emails Failed",
             int(metrics.get('emails_failed_total{error_type="default"}', 0))
         )
+
+    # Historical Metrics
+    st.subheader("Historical Metrics")
+    st.plotly_chart(create_time_series_chart(metrics), use_container_width=True)
 
     # Retry Statistics
     st.subheader("Retry Statistics")
