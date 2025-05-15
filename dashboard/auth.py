@@ -1,9 +1,17 @@
 import streamlit as st
 import hashlib
 import os
-from typing import Optional
+from typing import Optional, Dict, Any
 import json
 from datetime import datetime, timedelta
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import Flow
+from google.auth.transport.requests import Request
+import google.oauth2.credentials
+import google_auth_oauthlib.flow
+import google.auth.transport.requests
+import requests
+from pathlib import Path
 
 class DashboardAuth:
     def __init__(self, secrets_file: str = ".streamlit/secrets.toml"):
@@ -11,6 +19,26 @@ class DashboardAuth:
         self.secrets_file = secrets_file
         self._ensure_secrets_file()
         self._load_secrets()
+        self._init_oauth()
+
+    def _init_oauth(self):
+        """Initialize OAuth configuration."""
+        self.oauth_config = {
+            "web": {
+                "client_id": os.getenv("GOOGLE_CLIENT_ID", ""),
+                "client_secret": os.getenv("GOOGLE_CLIENT_SECRET", ""),
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "redirect_uris": ["http://localhost:8501"],
+                "javascript_origins": ["http://localhost:8501"]
+            }
+        }
+
+        # Save OAuth config to file for google_auth_oauthlib
+        oauth_config_path = Path(".streamlit/oauth_config.json")
+        oauth_config_path.parent.mkdir(exist_ok=True)
+        with open(oauth_config_path, "w") as f:
+            json.dump(self.oauth_config, f)
 
     def _ensure_secrets_file(self):
         """Ensure the secrets file exists with default credentials."""
@@ -44,22 +72,76 @@ class DashboardAuth:
         return hashlib.sha256(password.encode()).hexdigest()
 
     def authenticate(self, username: str, password: str) -> bool:
-        """Authenticate a user."""
+        """Authenticate a user with username/password."""
         if username not in self.secrets["credentials"]["usernames"]:
             return False
 
         stored_hash = self.secrets["credentials"]["usernames"][username]["password"]
         return self._hash_password(password) == stored_hash
 
+    def authenticate_oauth(self, credentials: Dict[str, Any]) -> bool:
+        """Authenticate a user with OAuth credentials."""
+        try:
+            # Verify the token with Google
+            response = requests.get(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={"Authorization": f"Bearer {credentials['token']}"}
+            )
+            if response.status_code == 200:
+                user_info = response.json()
+                email = user_info.get("email")
+
+                # Check if email is in allowed domains
+                allowed_domains = os.getenv("ALLOWED_EMAIL_DOMAINS", "").split(",")
+                if not allowed_domains or any(email.endswith(domain) for domain in allowed_domains):
+                    return True
+            return False
+        except Exception as e:
+            st.error(f"OAuth authentication failed: {str(e)}")
+            return False
+
     def login(self) -> Optional[str]:
         """Handle the login process."""
         if "authenticated" not in st.session_state:
             st.session_state.authenticated = False
             st.session_state.username = None
+            st.session_state.oauth_credentials = None
 
         if not st.session_state.authenticated:
             st.title("Dashboard Login")
 
+            # OAuth login
+            if os.getenv("GOOGLE_CLIENT_ID") and os.getenv("GOOGLE_CLIENT_SECRET"):
+                if st.button("Sign in with Google"):
+                    flow = google_auth_oauthlib.flow.Flow.from_client_config(
+                        self.oauth_config,
+                        scopes=["openid", "https://www.googleapis.com/auth/userinfo.email"]
+                    )
+                    flow.redirect_uri = "http://localhost:8501"
+
+                    authorization_url, state = flow.authorization_url(
+                        access_type="offline",
+                        include_granted_scopes="true"
+                    )
+
+                    st.markdown(f'<a href="{authorization_url}" target="_self">Click here to authenticate with Google</a>', unsafe_allow_html=True)
+
+                    # Handle OAuth callback
+                    if "code" in st.experimental_get_query_params():
+                        flow.fetch_token(
+                            authorization_response=st.experimental_get_query_params()["code"][0]
+                        )
+                        credentials = flow.credentials
+
+                        if self.authenticate_oauth(credentials):
+                            st.session_state.authenticated = True
+                            st.session_state.oauth_credentials = credentials
+                            st.success("Google authentication successful!")
+                            st.experimental_rerun()
+                        else:
+                            st.error("Google authentication failed. Please try again.")
+
+            # Traditional login
             with st.form("login_form"):
                 username = st.text_input("Username")
                 password = st.text_input("Password", type="password")
@@ -76,13 +158,14 @@ class DashboardAuth:
 
             return None
 
-        return st.session_state.username
+        return st.session_state.username or "OAuth User"
 
     def logout(self):
         """Handle the logout process."""
         if st.sidebar.button("Logout"):
             st.session_state.authenticated = False
             st.session_state.username = None
+            st.session_state.oauth_credentials = None
             st.experimental_rerun()
 
     def require_auth(self):

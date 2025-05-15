@@ -11,7 +11,7 @@ A real-time monitoring dashboard for the Email Service, built with Streamlit.
 - Historical metrics with time series charts
 - Metrics persistence with SQLite
 - Data export functionality
-- Secure authentication system
+- Secure authentication system (OAuth + Password)
 - Auto-refresh every 30 seconds
 
 ## Installation
@@ -26,10 +26,25 @@ pip install -r requirements.txt
    Edit `app.py` and update `API_BASE_URL` to point to your API endpoint.
 
 3. Set up authentication:
+
+   a. Password Authentication:
+
    - Default credentials are created in `.streamlit/secrets.toml`
    - Username: `admin`
    - Password: `admin`
    - **IMPORTANT**: Change these credentials in production!
+
+   b. Google OAuth (Optional):
+
+   - Create a project in Google Cloud Console
+   - Enable Google OAuth2 API
+   - Create OAuth 2.0 credentials
+   - Set environment variables:
+     ```bash
+     export GOOGLE_CLIENT_ID="your-client-id"
+     export GOOGLE_CLIENT_SECRET="your-client-secret"
+     export ALLOWED_EMAIL_DOMAINS="yourdomain.com,anotherdomain.com"
+     ```
 
 ## Running the Dashboard
 
@@ -81,19 +96,33 @@ The dashboard will be available at `http://localhost:8501`.
 
 ## Authentication
 
-The dashboard uses a secure authentication system:
+The dashboard supports multiple authentication methods:
 
-- Credentials stored in `.streamlit/secrets.toml`
-- Passwords are hashed using SHA-256
-- Session-based authentication
-- Automatic logout after browser close
-- Logout button in sidebar
+1. **Google OAuth**:
+
+   - Sign in with Google account
+   - Domain-based access control
+   - Secure token handling
+   - Automatic session management
+
+2. **Password Authentication**:
+   - Credentials stored in `.streamlit/secrets.toml`
+   - Passwords are hashed using SHA-256
+   - Session-based authentication
+   - Automatic logout after browser close
+   - Logout button in sidebar
 
 To add new users or change credentials:
 
-1. Edit `.streamlit/secrets.toml`
-2. Add new users under `credentials.usernames`
-3. Use the `auth.py` script to hash passwords
+1. For password auth:
+
+   - Edit `.streamlit/secrets.toml`
+   - Add new users under `credentials.usernames`
+   - Use the `auth.py` script to hash passwords
+
+2. For OAuth:
+   - Add allowed email domains to `ALLOWED_EMAIL_DOMAINS`
+   - Update OAuth credentials in Google Cloud Console
 
 ## Data Persistence
 
@@ -127,3 +156,5 @@ If metrics are not showing:
 6. Check SQLite database permissions
 7. Verify database file exists in dashboard directory
 8. Check authentication credentials in secrets file
+9. Verify OAuth configuration if using Google sign-in
+10. Check allowed email domains for OAuth users
