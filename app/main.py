@@ -18,6 +18,8 @@ from app.services.kixie_handler import KixieHandler
 from app.services.google_sheets import GoogleSheetsService
 from app.jobs.scheduler_service import start_scheduler
 from app.services.retry_logger import retry_logger
+from app.jobs.followup_service import followup_service
+from app.services.prometheus_metrics import collect_metrics
 import time
 
 # Initialize settings
@@ -118,92 +120,55 @@ async def shutdown_event():
 async def health_check():
     """Health check endpoint."""
     try:
-        # Check Supabase connection
-        supabase_status = "healthy" if await get_supabase_client().is_connected() else "unhealthy"
+        email_health = email_service.is_healthy()
+        followup_health = followup_service.is_healthy()
 
-        # Check email service - consider it healthy if not configured
-        email_status = "healthy" if not hasattr(email_service, 'gmail_service') or email_service.is_healthy() else "unhealthy"
+        if not (email_health and followup_health):
+            raise HTTPException(status_code=503, detail="Service unhealthy")
 
-        # Check Google Sheets sync - consider it healthy if not configured
-        sheets_status = "healthy" if not hasattr(sheet_sync, 'sheets_service') or sheet_sync.is_healthy() else "unhealthy"
-
-        # Overall status is healthy if Supabase is healthy and other services are either healthy or not configured
-        is_healthy = supabase_status == "healthy" and all(s in ["healthy", "not_configured"] for s in [email_status, sheets_status])
-
-        return {
-            "status": "healthy" if is_healthy else "degraded",
-            "timestamp": datetime.utcnow().isoformat(),
-            "version": "1.0.0",
-            "components": {
-                "supabase": supabase_status,
-                "email_service": email_status,
-                "sheets_sync": sheets_status
-            }
-        }
+        return {"status": "healthy"}
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
-        return {
-            "status": "unhealthy",
-            "timestamp": datetime.utcnow().isoformat(),
-            "version": "1.0.0",
-            "error": str(e)
-        }
+        raise HTTPException(status_code=503, detail=str(e))
 
 @app.get("/ready")
 async def readiness_check():
-    """Readiness check endpoint for Kubernetes/container orchestration."""
+    """Readiness check endpoint."""
     try:
-        # Check if Supabase is connected (required)
-        supabase_ready = await get_supabase_client().is_connected()
+        # Check if services are initialized
+        if not email_service.gmail_service:
+            logger.warning("Gmail service not initialized")
 
-        # Email service is ready if not configured or healthy
-        email_ready = not hasattr(email_service, 'gmail_service') or email_service.is_healthy()
-
-        # Sheets sync is ready if not configured or healthy
-        sheets_ready = not hasattr(sheet_sync, 'sheets_service') or sheet_sync.is_healthy()
-
-        # App is ready if Supabase is connected and other services are either ready or not configured
-        is_ready = supabase_ready and all([email_ready, sheets_ready])
+        # Check if scheduler is running
+        if not followup_service.scheduler.running:
+            raise HTTPException(status_code=503, detail="Scheduler not running")
 
         return {
-            "status": "ready" if is_ready else "not_ready",
-            "timestamp": datetime.utcnow().isoformat(),
-            "components": {
-                "supabase": "ready" if supabase_ready else "not_ready",
-                "email_service": "ready" if email_ready else "not_ready",
-                "sheets_sync": "ready" if sheets_ready else "not_ready"
+            "status": "ready",
+            "services": {
+                "email": "initialized",
+                "followup": "initialized",
+                "scheduler": "running"
             }
         }
     except Exception as e:
         logger.error(f"Readiness check failed: {str(e)}")
-        return {
-            "status": "not_ready",
-            "timestamp": datetime.utcnow().isoformat(),
-            "error": str(e)
-        }
+        raise HTTPException(status_code=503, detail=str(e))
 
 @app.get("/metrics")
 async def metrics():
-    """Expose service metrics and statistics."""
+    """Prometheus metrics endpoint."""
     try:
-        return {
-            "timestamp": datetime.utcnow().isoformat(),
-            "services": {
-                "email": email_service.get_stats(),
-                "followup": followup_service.get_stats(),
-                "retry_stats": retry_logger.get_stats()
-            },
-            "alerts": {
-                "email_queue": email_service.get_queue_status(),
-                "followup_queue": {
-                    "size": followup_service.metrics["queued_followups"],
-                    "threshold": followup_service.alert_threshold,
-                    "last_alert": followup_service.metrics["last_alert_time"]
-                }
-            }
-        }
+        # Collect and update metrics
+        collect_metrics()
+
+        # Return metrics in Prometheus format
+        return Response(
+            generate_latest(),
+            media_type=CONTENT_TYPE_LATEST
+        )
     except Exception as e:
-        logger.error(f"Metrics collection failed: {e}")
+        logger.error(f"Metrics collection failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.exception_handler(Exception)
