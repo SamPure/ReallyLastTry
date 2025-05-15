@@ -6,7 +6,6 @@ from app.services.config_manager import get_settings
 from pydantic import BaseModel
 from functools import wraps
 import time
-from httpx import Client as HTTPXClient
 
 logger = logging.getLogger(__name__)
 
@@ -64,12 +63,7 @@ class SupabaseClient:
     def initialize(self):
         """Initialize the Supabase client."""
         try:
-            http_client = HTTPXClient()  # Create HTTPX client without proxy
-            self._client = create_client(
-                settings.SUPABASE_URL,
-                settings.SUPABASE_SERVICE_KEY,
-                http_client=http_client
-            )
+            self._client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
             logger.info("Supabase client initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Supabase client: {str(e)}")
@@ -183,8 +177,14 @@ class SupabaseClient:
             logger.error(f"Supabase health check failed: {str(e)}")
             return False
 
-# Create a singleton instance
-supabase_client = SupabaseClient()
+# Defer client initialization
+_supabase_client = None
 
-# Export the singleton instance
-__all__ = ['supabase_client']
+def get_supabase_client():
+    global _supabase_client
+    if _supabase_client is None:
+        _supabase_client = SupabaseClient()
+    return _supabase_client
+
+# Export the getter function instead of the instance
+__all__ = ['get_supabase_client']
