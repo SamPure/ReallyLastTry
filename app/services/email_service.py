@@ -65,7 +65,6 @@ class EmailService:
         self.smtp_server = "smtp.gmail.com"
         self.smtp_port = 587
         self.sender_email = settings.EMAIL_SENDER
-        self.settings = get_settings()
         self.gmail_service = None
 
     def _initialize_gmail_service(self):

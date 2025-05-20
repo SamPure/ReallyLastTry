@@ -11,19 +11,19 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-scheduler = AsyncIOScheduler()
-
 class FollowupService:
     def __init__(self):
         self.supabase = get_supabase_client()
         self.email_service = email_service
         self.alert_threshold = settings.FOLLOWUP_QUEUE_ALERT_THRESHOLD
+        self.scheduler = AsyncIOScheduler()
         self.metrics = {
             "total_followups": 0,
             "successful_followups": 0,
             "failed_followups": 0,
             "queued_followups": 0,
-            "last_alert_time": None
+            "last_alert_time": None,
+            "last_run_time": None
         }
 
     def get_stats(self) -> Dict[str, Any]:
@@ -33,7 +33,9 @@ class FollowupService:
             "retry_stats": retry_logger.get_stats(),
             "queue_size": self.metrics["queued_followups"],
             "alert_threshold": self.alert_threshold,
-            "last_alert": self.metrics["last_alert_time"]
+            "last_alert": self.metrics["last_alert_time"],
+            "last_run": self.metrics["last_run_time"],
+            "scheduler_running": self.scheduler.running
         }
 
     def check_alert_threshold(self) -> None:
@@ -94,6 +96,7 @@ class FollowupService:
             return
 
         try:
+            self.metrics["last_run_time"] = datetime.utcnow().isoformat()
             # Get queued follow-ups
             queued = await self.supabase.get_queued_followups()
 
@@ -114,45 +117,49 @@ class FollowupService:
     def is_healthy(self) -> bool:
         """Check if follow-up service is healthy."""
         try:
+            # Check if scheduler is running
+            if not self.scheduler.running:
+                logger.error("Follow-up scheduler is not running")
+                return False
+
             # Check if queue size is within acceptable range
             if self.metrics["queued_followups"] > self.alert_threshold * 2:
+                logger.error(f"Follow-up queue size ({self.metrics['queued_followups']}) exceeds double threshold")
                 return False
 
             # Check if we have recent successful follow-ups
             if self.metrics["total_followups"] > 0 and self.metrics["successful_followups"] == 0:
+                logger.error("No successful follow-ups despite attempts")
                 return False
+
+            # Check if last run was within last hour
+            if self.metrics["last_run_time"]:
+                last_run = datetime.fromisoformat(self.metrics["last_run_time"])
+                if datetime.utcnow() - last_run > timedelta(hours=1):
+                    logger.error("No follow-up processing in the last hour")
+                    return False
 
             return True
         except Exception as e:
             logger.error(f"Follow-up service health check failed: {e}")
             return False
 
-@with_retry_logging(max_retries=3, job_name="monitor_queue_size")
-async def _monitor_queue_size():
-    """Monitor email queue size and process if needed."""
-    try:
-        email_service.check_alert_threshold()
-        await email_service._process_email_queue()
-    except Exception as e:
-        logger.error(f"Error monitoring queue size: {str(e)}")
-        raise
+    def start(self):
+        """Start the follow-up scheduler."""
+        try:
+            # Add queue monitoring job
+            self.scheduler.add_job(
+                lambda: asyncio.create_task(self.process_followup_queue()),
+                'interval',
+                minutes=5,
+                id='process_followups'
+            )
 
-def start_scheduler():
-    """Start the email scheduler."""
-    try:
-        # Add queue monitoring job
-        scheduler.add_job(
-            lambda: asyncio.create_task(_monitor_queue_size()),
-            'interval',
-            minutes=5,
-            id='monitor_queue'
-        )
-
-        scheduler.start()
-        logger.info("Email scheduler started")
-    except Exception as e:
-        logger.error(f"Failed to start email scheduler: {str(e)}")
-        raise
+            self.scheduler.start()
+            logger.info("Follow-up scheduler started")
+        except Exception as e:
+            logger.error(f"Failed to start follow-up scheduler: {str(e)}")
+            raise
 
 # Initialize singleton instance
 followup_service = FollowupService()

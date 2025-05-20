@@ -173,6 +173,20 @@ class SupabaseClient:
             logger.error(f"Failed to get lead details: {e}")
             return None
 
+    @retry_on_failure(times=3, delay=0.5)
+    async def fetch_leads(self) -> List[Dict[str, Any]]:
+        """Fetch all active leads."""
+        if not self.client:
+            logger.warning("Supabase client not initialized")
+            return []
+
+        try:
+            result = await self.client.table("leads").select("*").eq("status", "active").execute()
+            return result.data or []
+        except Exception as e:
+            logger.error(f"Failed to fetch leads: {e}")
+            return []
+
     async def is_connected(self) -> bool:
         """Check if the Supabase connection is healthy."""
         try:

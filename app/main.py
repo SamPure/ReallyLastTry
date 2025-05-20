@@ -92,7 +92,7 @@ async def startup_event():
         logger.info("Email scheduler started")
 
         # Start follow-up scheduler
-        start_scheduler()
+        followup_service.start()
         logger.info("Follow-up scheduler started")
 
         logger.info("Application startup complete")
@@ -111,6 +111,11 @@ async def shutdown_event():
         # Stop email scheduler
         stop_email_scheduler()
         logger.info("Email scheduler stopped")
+
+        # Stop follow-up scheduler
+        if followup_service.scheduler.running:
+            followup_service.scheduler.shutdown()
+            logger.info("Follow-up scheduler stopped")
 
         logger.info("Application shutdown complete")
     except Exception as e:
@@ -138,16 +143,23 @@ async def readiness_check():
         # Check if services are initialized
         if not email_service.gmail_service:
             logger.warning("Gmail service not initialized")
+            raise HTTPException(status_code=503, detail="Gmail service not initialized")
+
+        # Check if Supabase is connected
+        if not await get_supabase_client().is_connected():
+            logger.warning("Supabase not connected")
+            raise HTTPException(status_code=503, detail="Supabase not connected")
 
         # Check if scheduler is running
         if not followup_service.scheduler.running:
-            raise HTTPException(status_code=503, detail="Scheduler not running")
+            logger.warning("Follow-up scheduler not running")
+            raise HTTPException(status_code=503, detail="Follow-up scheduler not running")
 
         return {
             "status": "ready",
             "services": {
                 "email": "initialized",
-                "followup": "initialized",
+                "supabase": "connected",
                 "scheduler": "running"
             }
         }
