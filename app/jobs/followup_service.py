@@ -25,6 +25,7 @@ class FollowupService:
             "last_alert_time": None,
             "last_run_time": None
         }
+        self._is_started = False
 
     def get_stats(self) -> Dict[str, Any]:
         """Get follow-up service statistics."""
@@ -35,7 +36,8 @@ class FollowupService:
             "alert_threshold": self.alert_threshold,
             "last_alert": self.metrics["last_alert_time"],
             "last_run": self.metrics["last_run_time"],
-            "scheduler_running": self.scheduler.running
+            "scheduler_running": self.scheduler.running,
+            "service_started": self._is_started
         }
 
     def check_alert_threshold(self) -> None:
@@ -49,6 +51,10 @@ class FollowupService:
     @with_retry_logging(max_retries=3, job_name="send_followup")
     async def send_followup(self, lead_id: str, template_name: str, template_data: Dict[str, Any]) -> bool:
         """Send a follow-up email with retry logging."""
+        if not self._is_started:
+            logger.error("Followup service not started")
+            return False
+
         try:
             # Get lead details
             lead = await self.supabase.get_lead(lead_id)
@@ -92,31 +98,52 @@ class FollowupService:
 
     async def process_followup_queue(self) -> None:
         """Process queued follow-ups during business hours."""
+        if not self._is_started:
+            logger.error("Followup service not started")
+            return
+
         if not self.email_service.is_within_business_hours():
             return
 
         try:
             self.metrics["last_run_time"] = datetime.utcnow().isoformat()
             # Get queued follow-ups
-            queued = await self.supabase.get_queued_followups()
+            try:
+                queued = await self.supabase.get_queued_followups()
+            except Exception as e:
+                logger.exception("Failed to fetch queued follow-ups: %s", e)
+                raise
 
             for followup in queued:
-                success = await self.send_followup(
-                    lead_id=followup["lead_id"],
-                    template_name=followup["template_name"],
-                    template_data=followup["template_data"]
-                )
+                try:
+                    success = await self.send_followup(
+                        lead_id=followup["lead_id"],
+                        template_name=followup["template_name"],
+                        template_data=followup["template_data"]
+                    )
 
-                if success:
-                    await self.supabase.mark_followup_sent(followup["id"])
-                    self.metrics["queued_followups"] -= 1
+                    if success:
+                        try:
+                            await self.supabase.mark_followup_sent(followup["id"])
+                            self.metrics["queued_followups"] -= 1
+                        except Exception as e:
+                            logger.exception("Failed to mark follow-up as sent: %s", e)
+                            raise
+                except Exception as e:
+                    logger.exception("Failed to process follow-up %s: %s", followup["id"], e)
+                    raise
 
         except Exception as e:
-            logger.error(f"Error processing follow-up queue: {e}")
+            logger.exception("Follow-up job crashed: %s", e)
+            raise
 
     def is_healthy(self) -> bool:
         """Check if follow-up service is healthy."""
         try:
+            if not self._is_started:
+                logger.error("Followup service not started")
+                return False
+
             # Check if scheduler is running
             if not self.scheduler.running:
                 logger.error("Follow-up scheduler is not running")
@@ -146,6 +173,10 @@ class FollowupService:
 
     def start(self):
         """Start the follow-up scheduler."""
+        if self._is_started:
+            logger.warning("Followup service already started")
+            return
+
         try:
             # Add queue monitoring job
             self.scheduler.add_job(
@@ -156,6 +187,7 @@ class FollowupService:
             )
 
             self.scheduler.start()
+            self._is_started = True
             logger.info("Follow-up scheduler started")
         except Exception as e:
             logger.error(f"Failed to start follow-up scheduler: {str(e)}")
