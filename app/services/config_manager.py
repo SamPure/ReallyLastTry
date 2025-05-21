@@ -100,6 +100,9 @@ class Settings(BaseSettings):
         "default": 0.5
     }
 
+    # Followup Queue Alert Threshold
+    FOLLOWUP_QUEUE_ALERT_THRESHOLD: int = 100
+
     class Config:
         env_file = ".env"
         case_sensitive = True
