@@ -87,6 +87,19 @@ class Settings(BaseSettings):
     BATCH_CHUNK_SIZE: int = 500
     MAX_RETRIES: int = 3
 
+    # Priority Scoring Settings
+    PRIORITY_RECENCY_WEIGHT: float = 0.5
+    PRIORITY_ENGAGEMENT_WEIGHT: float = 0.3
+    PRIORITY_CLASS_WEIGHT: float = 0.2
+    PRIORITY_RECENCY_HALF_LIFE_DAYS: int = 7
+    PRIORITY_ENGAGEMENT_WINDOW_DAYS: int = 14
+    PRIORITY_CLASS_SCORES: dict = {
+        "hot": 1.0,
+        "warm": 0.7,
+        "cold": 0.3,
+        "default": 0.5
+    }
+
     class Config:
         env_file = ".env"
         case_sensitive = True
