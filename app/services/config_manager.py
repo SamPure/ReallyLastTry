@@ -1,8 +1,9 @@
 from typing import Optional, List, Dict, Any
 from pydantic_settings import BaseSettings
-from pydantic import validator, EmailStr, HttpUrl, Field
+from pydantic import validator, EmailStr, HttpUrl, Field, model_validator
 import json
 import logging
+import re
 from functools import lru_cache
 import os
 
@@ -12,6 +13,8 @@ class Settings(BaseSettings):
     # Environment
     ENV: str = "development"
     DEBUG: bool = True
+    ENVIRONMENT: str = "production"
+    DEFAULT_AREA_CODE: str = "212"
 
     # API Settings
     API_V1_STR: str = "/api/v1"
@@ -40,12 +43,27 @@ class Settings(BaseSettings):
     EMAIL_BATCH_SIZE: int = 50
     EMAIL_BATCH_DELAY: int = 1
     EMAIL_QUEUE_ALERT_THRESHOLD: int = 1000
+    EMAIL_PASSWORD: Optional[str] = None
+    REPORT_EMAIL: Optional[str] = None
+    SMTP_SERVER: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+
+    # Gmail Configuration
+    GMAIL_USER: Optional[str] = None
+    GMAIL_CLIENT_ID: Optional[str] = None
+    GMAIL_CLIENT_SECRET: Optional[str] = None
+    GMAIL_REFRESH_TOKEN: Optional[str] = None
+    GMAIL_APP_PASSWORD: Optional[str] = None
 
     # Kixie SMS Configuration
     KIXIE_BASE_URL: str = Field(default="https://api.kixie.com/v1")
     KIXIE_API_KEY: str = Field(default="")
     KIXIE_SECRET: str = Field(default="")
     KIXIE_BUSINESS_ID: str = Field(default="")
+
+    # Core Infrastructure
+    PORT: int = 8000
+    PROMETHEUS_PORT: int = 8001
 
     # JWT
     JWT_ALGORITHM: str = "HS256"
@@ -66,60 +84,80 @@ class Settings(BaseSettings):
     # Batch Processing
     BATCH_SIZE: int = 100
     BATCH_DELAY: int = 1
-
-    # Priority Scoring Settings
-    PRIORITY_RECENCY_WEIGHT: float = Field(0.5)
-    PRIORITY_ENGAGEMENT_WEIGHT: float = Field(0.3)
-    PRIORITY_CLASS_WEIGHT: float = Field(0.2)
-    PRIORITY_RECENCY_HALF_LIFE_DAYS: int = Field(7)
-    PRIORITY_ENGAGEMENT_WINDOW_DAYS: int = Field(14)
-    PRIORITY_CLASS_SCORES: dict = Field(default_factory=lambda: {
-        "hot": 1.0,
-        "warm": 0.7,
-        "cold": 0.3,
-        "default": 0.5
-    })
-
-    # Follow-up Configuration
-    FOLLOWUP_START_HOUR: int = Field(default=9, description="Hour to start follow-ups (0-23)")
-    FOLLOWUP_END_HOUR: int = Field(default=17, description="Hour to end follow-ups (0-23)")
-    FOLLOWUP_QUEUE_ALERT_THRESHOLD: int = Field(default=100)
-    FOLLOWUP_BATCH_SIZE: int = Field(default=50)
-    FOLLOWUP_RETRY_DELAY: int = Field(default=300)
-
-    @validator("GOOGLE_CREDENTIALS", pre=True)
-    def parse_google_credentials(cls, v):
-        """Parse Google service account credentials from JSON string if needed, handling escaped newlines."""
-        if isinstance(v, str):
-            try:
-                # Replace escaped \n with real newlines for private_key
-                v = v.replace('\\n', '\n')
-                return json.loads(v)
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Invalid Google service account JSON: {e}")
-        return v
-
-    @validator("CORS_ORIGINS", pre=True)
-    def assemble_cors_origins(cls, v):
-        """Parse CORS origins from comma-separated string if needed."""
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
-        return v
+    BATCH_CHUNK_SIZE: int = 500
+    MAX_RETRIES: int = 3
 
     class Config:
-        case_sensitive = True
         env_file = ".env"
+        case_sensitive = True
+
+    @validator("SHEET_ID")
+    def validate_sheet_id(cls, v):
+        if v and len(v) < 10:  # Only validate if value is provided
+            raise ValueError("SHEET_ID must be a valid Google Sheet ID")
+        return v
+
+    @validator("GMAIL_USER")
+    def validate_email_sender(cls, v):
+        if v:  # Only validate if value is provided
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            if not re.match(email_pattern, v):
+                raise ValueError("GMAIL_USER must be a valid email address")
+        return v
+
+    @validator("KIXIE_API_KEY")
+    def validate_kixie_key(cls, v):
+        if v and len(v) < 10:  # Only validate if value is provided
+            raise ValueError("KIXIE_API_KEY must be a valid API key")
+        return v
+
+    @validator("SUPABASE_URL")
+    def validate_supabase_url(cls, v):
+        if v and not v.startswith("https://"):  # Only validate if value is provided
+            raise ValueError("SUPABASE_URL must be a valid HTTPS URL")
+        return v
+
+    @model_validator(mode="after")
+    def validate_related_settings(self) -> 'Settings':
+        """Validate that related settings are consistent."""
+        # If email features are enabled, ensure sender is set
+        if self.EMAIL_PASSWORD and not self.GMAIL_USER:
+            raise ValueError("GMAIL_USER must be set when EMAIL_PASSWORD is provided")
+
+        # If Supabase is enabled, ensure URL is valid
+        if self.SUPABASE_SERVICE_KEY and not self.SUPABASE_URL:
+            raise ValueError("SUPABASE_URL must be set when SUPABASE_SERVICE_KEY is provided")
+
+        return self
+
+    def validate_optional_settings(self) -> None:
+        """Validate optional settings and log warnings for missing values."""
+        # Google Sheets
+        if not self.GOOGLE_CREDENTIALS:
+            logger.warning("GOOGLE_CREDENTIALS is missing—Google Sheets features will be disabled!")
+        if not self.SHEET_ID:
+            logger.warning("SHEET_ID is missing—Google Sheets features will be disabled!")
+
+        # Email
+        if not self.EMAIL_PASSWORD:
+            logger.warning("EMAIL_PASSWORD is missing—email features will be disabled!")
+        if not self.REPORT_EMAIL:
+            logger.warning("REPORT_EMAIL is missing—daily reports will be disabled!")
+
+        # SMS (Kixie)
+        if not self.KIXIE_API_KEY:
+            logger.warning("KIXIE_API_KEY is missing—SMS features will be disabled!")
+        if not self.KIXIE_BASE_URL:
+            logger.warning("KIXIE_BASE_URL is missing—SMS features will be disabled!")
+
+        # Supabase
+        if not self.SUPABASE_SERVICE_KEY:
+            logger.warning("SUPABASE_SERVICE_KEY is missing—Supabase features will be disabled!")
 
 @lru_cache()
 def get_settings() -> Settings:
     """Get cached settings instance."""
-    try:
-        settings = Settings()
-        logger.info(f"Loaded settings for environment: {settings.ENV}")
-        return settings
-    except Exception as e:
-        logger.error(f"Failed to load settings: {e}")
-        raise
+    return Settings()
 
 # Initialize settings
 settings = get_settings()

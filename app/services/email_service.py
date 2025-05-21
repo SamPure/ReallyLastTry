@@ -70,11 +70,11 @@ class EmailService:
     def _initialize_gmail_service(self):
         """Initialize Gmail API service."""
         try:
-            if not self.settings.GOOGLE_SHEETS_CREDENTIALS_JSON:
+            if not settings.GOOGLE_SHEETS_CREDENTIALS_JSON:
                 logger.warning("No Gmail credentials provided, email service will be disabled")
                 return
 
-            credentials_json = json.loads(self.settings.GOOGLE_SHEETS_CREDENTIALS_JSON)
+            credentials_json = json.loads(settings.GOOGLE_SHEETS_CREDENTIALS_JSON)
             credentials = service_account.Credentials.from_service_account_info(
                 credentials_json,
                 scopes=['https://www.googleapis.com/auth/gmail.send']

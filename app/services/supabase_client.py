@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from functools import wraps
 import time
 import os
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ def retry_on_failure(times: int = 3, delay: float = 1.0):
                     if attempt < times - 1:  # Don't sleep on the last attempt
                         sleep_time = delay * (2 ** attempt)
                         logger.info(f"Retrying in {sleep_time:.2f} seconds...")
-                        time.sleep(sleep_time)
+                        await asyncio.sleep(sleep_time)
 
             logger.error(
                 f"Supabase call failed after {times} attempts",
@@ -105,7 +106,7 @@ class SupabaseClient:
                 "metadata": metadata or {},
                 "created_at": datetime.utcnow().isoformat()
             }
-            result = await self.client.table("conversations").insert(data).execute()
+            result = self.client.table("conversations").insert(data).execute()
             return result.data[0] if result.data else None
         except Exception as e:
             logger.error(f"Failed to insert conversation: {e}")
@@ -129,7 +130,7 @@ class SupabaseClient:
             if before_date:
                 query = query.lt("created_at", before_date.isoformat())
 
-            result = await query.order("created_at", desc=True).limit(limit).execute()
+            result = query.order("created_at", desc=True).limit(limit).execute()
             return result.data or []
         except Exception as e:
             logger.error(f"Failed to fetch conversations: {e}")
@@ -153,7 +154,7 @@ class SupabaseClient:
                 "metadata": metadata or {},
                 "updated_at": datetime.utcnow().isoformat()
             }
-            result = await self.client.table("leads").update(data).eq("id", lead_id).execute()
+            result = self.client.table("leads").update(data).eq("id", lead_id).execute()
             return result.data[0] if result.data else None
         except Exception as e:
             logger.error(f"Failed to update lead status: {e}")
@@ -167,7 +168,7 @@ class SupabaseClient:
             return None
 
         try:
-            result = await self.client.table("leads").select("*").eq("id", lead_id).execute()
+            result = self.client.table("leads").select("*").eq("id", lead_id).execute()
             return result.data[0] if result.data else None
         except Exception as e:
             logger.error(f"Failed to get lead details: {e}")
@@ -181,7 +182,7 @@ class SupabaseClient:
             return []
 
         try:
-            result = await self.client.table("leads").select("*").eq("status", "active").execute()
+            result = self.client.table("leads").select("*").eq("status", "active").execute()
             return result.data or []
         except Exception as e:
             logger.error(f"Failed to fetch leads: {e}")
@@ -191,11 +192,43 @@ class SupabaseClient:
         """Check if the Supabase connection is healthy."""
         try:
             # Try to execute a simple query
-            await self.client.table("leads").select("count", count="exact").limit(1).execute()
+            self.client.table("leads").select("count", count="exact").limit(1).execute()
             return True
         except Exception as e:
             logger.error(f"Supabase health check failed: {str(e)}")
             return False
+
+    @retry_on_failure(times=3, delay=0.5)
+    async def get_queued_followups(self) -> List[Dict[str, Any]]:
+        """Fetch all queued follow-ups."""
+        if not self.client:
+            logger.warning("Supabase client not initialized")
+            return []
+
+        try:
+            result = self.client.table("followups").select("*").eq("status", "queued").execute()
+            return result.data or []
+        except Exception as e:
+            logger.error(f"Failed to fetch queued follow-ups: {e}")
+            return []
+
+    @retry_on_failure(times=3, delay=0.5)
+    async def mark_followup_sent(self, followup_id: str) -> Optional[Dict[str, Any]]:
+        """Mark a follow-up as sent."""
+        if not self.client:
+            logger.warning("Supabase client not initialized")
+            return None
+
+        try:
+            data = {
+                "status": "sent",
+                "sent_at": datetime.utcnow().isoformat()
+            }
+            result = self.client.table("followups").update(data).eq("id", followup_id).execute()
+            return result.data[0] if result.data else None
+        except Exception as e:
+            logger.error(f"Failed to mark follow-up as sent: {e}")
+            return None
 
 # Defer client initialization
 _supabase_client = None

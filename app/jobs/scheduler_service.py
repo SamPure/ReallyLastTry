@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.services.config_manager import get_settings
@@ -72,23 +72,18 @@ async def send_followup(lead_id: str, score: float):
         logger.error(f"❌ Failed to send follow-up to lead {lead_id}: {e}")
         raise
 
+async def _run_followups_wrapper():
+    """Wrapper to ensure the coroutine is properly awaited."""
+    await run_followups()
+
 def start_scheduler():
     try:
         # Start the followup service first
         followup_service.start()
         
-        # run every business hour
-        scheduler.add_job(
-            lambda: asyncio.create_task(run_followups()),
-            "cron",
-            day_of_week="mon-fri",
-            hour=f"{settings.FOLLOWUP_START_HOUR}-{settings.FOLLOWUP_END_HOUR}",
-            minute=0,
-            id="followup_scheduler"
-        )
-        logger.info("✅ Follow-up batch job scheduled")
+        # Start the main scheduler
         scheduler.start()
-        logger.info("✅ Follow-up scheduler started")
+        logger.info("✅ Scheduler started")
     except Exception as e:
         logger.error(f"❌ Failed to start scheduler: {e}")
         raise
@@ -103,6 +98,13 @@ def is_healthy() -> bool:
         if not followup_service.is_healthy():
             logger.error("Followup service is not healthy")
             return False
+
+        # Check if last run was within last 24 hours
+        if followup_service.metrics["last_run_time"]:
+            last_run = datetime.fromisoformat(followup_service.metrics["last_run_time"])
+            if datetime.utcnow() - last_run > timedelta(hours=24):
+                logger.error("No follow-up processing in the last 24 hours")
+                return False
             
         return True
     except Exception as e:

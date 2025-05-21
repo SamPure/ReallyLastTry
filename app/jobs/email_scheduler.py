@@ -86,12 +86,20 @@ async def _monitor_queue_size():
             f"({settings.EMAIL_QUEUE_ALERT_THRESHOLD})"
         )
 
+async def _process_queue_wrapper():
+    """Wrapper to ensure the coroutine is properly awaited."""
+    await _process_queue()
+
+async def _monitor_queue_size_wrapper():
+    """Wrapper to ensure the coroutine is properly awaited."""
+    await _monitor_queue_size()
+
 def start_email_scheduler():
     """Start the email scheduler with queue processing and monitoring jobs."""
     try:
         # Main queue processing job
         scheduler.add_job(
-            lambda: asyncio.create_task(_process_queue()),
+            _process_queue_wrapper,
             CronTrigger(
                 day_of_week="mon-fri",
                 hour=f"{settings.EMAIL_START_HOUR}-{settings.EMAIL_END_HOUR}",
@@ -103,7 +111,7 @@ def start_email_scheduler():
 
         # Queue monitoring job (runs every 15 minutes)
         scheduler.add_job(
-            lambda: asyncio.create_task(_monitor_queue_size()),
+            _monitor_queue_size_wrapper,
             CronTrigger(minute="*/15"),
             id="email_queue_monitor",
             replace_existing=True

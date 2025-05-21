@@ -180,10 +180,18 @@ async def _sync_tones():
     logging.info("Starting tones sync")
     await get_google_sheets_service().upsert_tones()
 
+async def _sync_leads_wrapper():
+    """Wrapper to ensure the coroutine is properly awaited."""
+    await _sync_leads()
+
+async def _sync_tones_wrapper():
+    """Wrapper to ensure the coroutine is properly awaited."""
+    await _sync_tones()
+
 def start_scheduler():
     # Schedule leads sync at configured hour/minute
     scheduler.add_job(
-        lambda: asyncio.create_task(_sync_leads()),
+        _sync_leads_wrapper,
         "cron",
         hour=settings.SHEET_SYNC_HOUR,
         minute=settings.SHEET_SYNC_MINUTE,
@@ -191,7 +199,7 @@ def start_scheduler():
     )
     # Schedule tones sync offset by 5 minutes
     scheduler.add_job(
-        lambda: asyncio.create_task(_sync_tones()),
+        _sync_tones_wrapper,
         "cron",
         hour=settings.SHEET_SYNC_HOUR,
         minute=(settings.SHEET_SYNC_MINUTE + 5) % 60,

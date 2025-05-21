@@ -16,7 +16,7 @@ from app.jobs.email_scheduler import start_email_scheduler, stop_email_scheduler
 from app.services.email_service import email_service, EmailService
 from app.services.kixie_handler import KixieHandler
 from app.services.google_sheets import GoogleSheetsService
-from app.jobs.scheduler_service import start_scheduler
+from app.jobs.scheduler_service import start_scheduler, is_healthy as scheduler_healthy
 from app.services.retry_logger import retry_logger
 from app.jobs.followup_service import followup_service
 from app.services.prometheus_metrics import collect_metrics
@@ -84,20 +84,32 @@ async def startup_event():
     """Initialize services on startup."""
     try:
         # Initialize Supabase client
-        get_supabase_client().initialize()
-        logger.info("Supabase client initialized successfully")
+        try:
+            get_supabase_client().initialize()
+            logger.info("Supabase client initialized successfully")
+        except Exception as e:
+            logger.exception("Failed to initialize Supabase client: %s", e)
+            raise
 
         # Start email scheduler
-        start_email_scheduler()
-        logger.info("Email scheduler started")
+        try:
+            start_email_scheduler()
+            logger.info("Email scheduler started")
+        except Exception as e:
+            logger.exception("Failed to start email scheduler: %s", e)
+            raise
 
         # Start follow-up scheduler
-        followup_service.start()
-        logger.info("Follow-up scheduler started")
+        try:
+            start_scheduler()
+            logger.info("Follow-up scheduler started")
+        except Exception as e:
+            logger.exception("Failed to start follow-up scheduler: %s", e)
+            raise
 
         logger.info("Application startup complete")
     except Exception as e:
-        logger.error(f"Startup failed: {e}")
+        logger.exception("Startup failed: %s", e)
         raise
 
 @app.on_event("shutdown")
@@ -126,9 +138,9 @@ async def health_check():
     """Health check endpoint."""
     try:
         email_health = email_service.is_healthy()
-        followup_health = followup_service.is_healthy()
+        scheduler_health = scheduler_healthy()
 
-        if not (email_health and followup_health):
+        if not (email_health and scheduler_health):
             raise HTTPException(status_code=503, detail="Service unhealthy")
 
         return {"status": "healthy"}
@@ -151,9 +163,9 @@ async def readiness_check():
             raise HTTPException(status_code=503, detail="Supabase not connected")
 
         # Check if scheduler is running
-        if not followup_service.scheduler.running:
-            logger.warning("Follow-up scheduler not running")
-            raise HTTPException(status_code=503, detail="Follow-up scheduler not running")
+        if not scheduler_healthy():
+            logger.warning("Scheduler not healthy")
+            raise HTTPException(status_code=503, detail="Scheduler not healthy")
 
         return {
             "status": "ready",

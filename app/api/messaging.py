@@ -6,6 +6,7 @@ from app.api.dependencies import get_current_active_user, get_current_admin_user
 from app.services.kixie_handler import kixie_handler
 from app.services.email_service import email_service
 from app.services.supabase_client import get_supabase_client
+from app.jobs.scheduler_service import run_followups
 
 router = APIRouter(prefix="/messaging", tags=["messaging"])
 
@@ -109,6 +110,21 @@ async def send_daily_report(
         # Send daily report
         response = await email_service.send_daily_report()
         return response
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@router.post("/followups/trigger", status_code=status.HTTP_200_OK)
+async def trigger_followups(
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Manually trigger the follow-up process."""
+    try:
+        # Run follow-ups
+        await run_followups()
+        return {"status": "success", "message": "Follow-ups triggered successfully"}
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -159,17 +159,21 @@ class FollowupService:
                 logger.error("No successful follow-ups despite attempts")
                 return False
 
-            # Check if last run was within last hour
+            # Check if last run was within last 24 hours
             if self.metrics["last_run_time"]:
                 last_run = datetime.fromisoformat(self.metrics["last_run_time"])
-                if datetime.utcnow() - last_run > timedelta(hours=1):
-                    logger.error("No follow-up processing in the last hour")
+                if datetime.utcnow() - last_run > timedelta(hours=24):
+                    logger.error("No follow-up processing in the last 24 hours")
                     return False
 
             return True
         except Exception as e:
             logger.error(f"Follow-up service health check failed: {e}")
             return False
+
+    async def _process_followup_queue_wrapper(self):
+        """Wrapper to ensure the coroutine is properly awaited."""
+        await self.process_followup_queue()
 
     def start(self):
         """Start the follow-up scheduler."""
@@ -178,11 +182,12 @@ class FollowupService:
             return
 
         try:
-            # Add queue monitoring job
+            # Add queue monitoring job to run at 9 AM
             self.scheduler.add_job(
-                lambda: asyncio.create_task(self.process_followup_queue()),
-                'interval',
-                minutes=5,
+                self._process_followup_queue_wrapper,
+                'cron',
+                hour=9,
+                minute=0,
                 id='process_followups'
             )
 
