@@ -1,6 +1,6 @@
 import logging
 import httpx
-from app.config import settings
+from app.services.config_manager import settings
 
 logger = logging.getLogger("lead_followup.kixie_service")
 

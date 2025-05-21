@@ -1,6 +1,6 @@
 from datetime import datetime
 import pytz
-from app.config import settings
+from app.services.config_manager import settings
 
 
 def get_timezone_from_area_code(area_code: str) -> str:

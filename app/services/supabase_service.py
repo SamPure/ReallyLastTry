@@ -3,7 +3,7 @@ import time
 import random
 from datetime import datetime
 from prometheus_client import Counter
-from app.config import settings
+from app.services.config_manager import settings
 from app.core.decorators import with_retry
 
 logger = logging.getLogger("lead_followup.supabase_service")

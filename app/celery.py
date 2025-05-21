@@ -1,5 +1,5 @@
 from celery import Celery
-from app.config import settings
+from app.services.config_manager import settings
 
 celery = Celery(
     "lead_followup",
